@@ -11,7 +11,7 @@ with workflow.unsafe.imports_passed_through():
 
 @workflow.defn
 class GenerateIllustrationWorkflow:
-    """Child workflow that generates a story illustration via OpenAI."""
+    """Workflow that generates a story illustration via OpenAI."""
 
     @workflow.run
     async def run(self, input: GenerateIllustrationInput) -> str:
