@@ -49,6 +49,7 @@ async function pollState() {
         if (state.finished) {
             document.getElementById("chat-panel").classList.add("finished");
 
+            // Keep polling until the illustration is ready, then stop.
             if (!state.story.illustration_loading) {
                 clearInterval(polling);
             }
@@ -173,7 +174,9 @@ async function sendMessage() {
     chatInput.value = "";
     setInputEnabled(false);
 
-    // Optimistically show user message
+    // Optimistically render the user message before the server round-trip.
+    // Increment lastMessageCount so pollState() won't duplicate it when the
+    // server-side state catches up.
     const div = document.createElement("div");
     div.className = "chat-msg user";
     div.textContent = message;

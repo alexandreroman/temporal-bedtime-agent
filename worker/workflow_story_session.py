@@ -5,6 +5,9 @@ from datetime import timedelta
 from temporalio import workflow
 from temporalio.common import RetryPolicy
 
+# Temporal's workflow sandbox restricts imports to enforce determinism.
+# `imports_passed_through()` lets these non-deterministic libraries bypass
+# the sandbox since they are only used inside activities, not workflow logic.
 with workflow.unsafe.imports_passed_through():
     import annotated_types  # noqa: F401 — pre-load to avoid sandbox warning
 
@@ -37,12 +40,16 @@ temporal_agent = TemporalAgent(
 
 @workflow.defn
 class StorySessionWorkflow:
+    # Declares which TemporalAgents this workflow uses, so their activities
+    # are automatically registered on the worker.
     __pydantic_ai_agents__ = [temporal_agent]
 
     def __init__(self) -> None:
         self._messages: list[ChatMessage] = []
         self._story: Story = Story()
         self._finished: bool = False
+        # Signal-driven message passing: the signal handler sets this value,
+        # and the main loop picks it up via wait_condition().
         self._pending_user_message: str | None = None
         self._processing: bool = False
 
@@ -81,7 +88,9 @@ class StorySessionWorkflow:
             self._messages.append(ChatMessage(role=Role.USER, content=user_msg))
             self._processing = True
 
-            # Build pydantic-ai message history from prior turns
+            # Rebuild pydantic-ai message history from prior turns (excluding
+            # the latest user message, which is passed as the prompt below).
+            # This gives the LLM full conversational context.
             message_history: list[ModelMessage] = []
             for msg in self._messages[:-1]:
                 if msg.role == Role.USER:

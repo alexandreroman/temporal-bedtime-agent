@@ -80,6 +80,8 @@ story_agent: Agent[None, StoryResponse] = Agent(
     output_type=StoryResponse,
 )
 
+# The image model needs an explicit profile override because pydantic-ai
+# cannot auto-detect image output support from the model string alone.
 _image_model = infer_model(PYDANTIC_AI_IMAGE_MODEL)
 _image_model.profile = OpenAIModelProfile(supports_image_output=True)
 

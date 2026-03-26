@@ -12,6 +12,9 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from webui.config import TASK_QUEUE, TEMPORAL_ADDRESS
 from webui.models import SessionState, Story
+# The worker and webui have separate SessionState models: the worker's model
+# is what Temporal stores (no illustration URL), while the webui's model adds
+# presentation fields (illustration_url, illustration_loading, session_id).
 from worker.models import SessionState as WorkerSessionState
 
 structlog.configure(
@@ -28,6 +31,8 @@ STATIC_DIR = "static"
 app = FastAPI(title="Temporal Bedtime Agent")
 logger = structlog.get_logger("webui")
 
+# Lazy singleton — the webui does not need the PydanticAIPlugin since it only
+# starts workflows by string name; the worker handles actual execution.
 _client: Client | None = None
 
 
@@ -134,7 +139,9 @@ async def get_session_state(session_id: str) -> SessionState:
         logger.error("Failed to get session state", session_id=session_id, error=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
-    # Only start generating the illustration once the story is complete
+    # Illustration generation is triggered lazily: on each poll, the webui
+    # checks if the story is complete and starts/polls the illustration
+    # workflow. This avoids a tight coupling between the two workflows.
     has_prompt = bool(worker_state.story.illustration_prompt)
     story_ready = bool(worker_state.story.text)
 
@@ -147,6 +154,7 @@ async def get_session_state(session_id: str) -> SessionState:
         except Exception as e:
             logger.error("Illustration sync failed", session_id=session_id, error=str(e))
 
+    # True while the illustration workflow is running but hasn't completed yet.
     illustration_loading = has_prompt and story_ready and not illustration_url
 
     return SessionState(
@@ -195,6 +203,7 @@ async def index() -> FileResponse:
     return FileResponse(f"{STATIC_DIR}/index.html")
 
 
+# Catch-all for deep-linked story URLs — the SPA handles routing client-side.
 @app.get("/stories/{story_id}")
 async def session_page(story_id: str) -> FileResponse:
     return FileResponse(f"{STATIC_DIR}/index.html")
