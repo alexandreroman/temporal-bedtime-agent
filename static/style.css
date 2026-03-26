@@ -1,0 +1,100 @@
+/* Thin scrollbars */
+.scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #333 transparent;
+}
+.scrollbar-thin::-webkit-scrollbar { width: 6px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+
+/* Chat messages (dynamically created by JS) */
+.chat-msg {
+    max-width: 80%;
+    padding: 0.625rem 0.875rem;
+    border-radius: 12px;
+    line-height: 1.55;
+    font-size: 0.875rem;
+    animation: fadeIn 0.25s ease;
+}
+.chat-msg.user {
+    align-self: flex-end;
+    background: #00C895;
+    color: #000;
+    font-weight: 450;
+    border-bottom-right-radius: 4px;
+}
+.chat-msg.assistant {
+    align-self: flex-start;
+    background: #1E1E1E;
+    border: 1px solid #2D2D2D;
+    border-bottom-left-radius: 4px;
+}
+.chat-msg.typing {
+    align-self: flex-start;
+    background: #1E1E1E;
+    color: #999;
+    border: 1px solid #2D2D2D;
+    font-size: 0.8125rem;
+}
+
+/* Markdown inside messages */
+.chat-msg p { margin: 0 0 0.4rem; }
+.chat-msg p:last-child { margin-bottom: 0; }
+.chat-msg.assistant strong { color: #00C895; font-weight: 600; }
+.chat-msg.assistant em { color: #999; }
+.chat-msg.assistant ul,
+.chat-msg.assistant ol { margin: 0.25rem 0 0.4rem 1.25rem; }
+.chat-msg.assistant code {
+    background: rgba(0,0,0,0.3);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+    font-size: 0.8em;
+}
+
+/* Story text markdown */
+.story-text p { margin-bottom: 0.15rem; }
+.story-text p:last-child { margin-bottom: 0; }
+.story-text em { color: #00C895; }
+
+/* Progressive story reveal */
+.story-hidden {
+    opacity: 0;
+    transform: translateY(12px);
+}
+.story-reveal {
+    animation: storyReveal 0.6s ease forwards;
+}
+@keyframes storyReveal {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.dots::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+}
+@keyframes dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+}
+
+/* Finished state */
+#restart-link { display: none; }
+#chat-panel.finished #chat-input-bar { display: none; }
+#chat-panel.finished #restart-link { display: flex; }
+
+/* Illustration loading spinner */
+.illust-spin {
+    animation: spin 1.2s linear infinite;
+}
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
