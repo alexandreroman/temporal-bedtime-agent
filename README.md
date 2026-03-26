@@ -33,17 +33,7 @@ graph LR
 
 ## Getting Started
 
-### 1. Start a Temporal Server
-
-The easiest way is to use the [Temporal CLI](https://docs.temporal.io/cli):
-
-```bash
-temporal server start-dev
-```
-
-This starts a local Temporal server on `localhost:7233`.
-
-### 2. Configure Environment Variables
+### 1. Configure Environment Variables
 
 ```bash
 cp .env-sample .env
@@ -62,31 +52,30 @@ Edit `.env` and fill in your API keys:
 | `WEBUI_HOST` | Web UI bind address | `0.0.0.0` |
 | `WEBUI_PORT` | Web UI port | `8000` |
 
-### 3. Install Dependencies
+### 2. Install Dependencies
 
 ```bash
 uv sync
 ```
 
-### 4. Run the Application
+### 3. Run the Application
 
-Start the worker (which also serves the web UI):
-
-```bash
-uv run worker
-```
-
-Or run the web UI and worker separately in two terminals:
+Start each command in a separate terminal:
 
 ```bash
-# Terminal 1 — Web UI
-uv run webui
+# Terminal 1 — Temporal Server
+temporal server start-dev
 
 # Terminal 2 — Temporal Worker
 uv run worker
+
+# Terminal 3 — Web UI
+uv run webui
 ```
 
 Then open [http://localhost:8000](http://localhost:8000) in your browser and start creating a bedtime story!
+
+> You need the [Temporal CLI](https://docs.temporal.io/cli) to run `temporal server start-dev`.
 
 ## Project Structure
 
