@@ -85,10 +85,24 @@
     75%  { content: '...'; }
 }
 
+/* Hide story panel on small screens until story is ready */
+@media (max-width: 1023px) {
+    #story-panel.story-pending { display: none; }
+}
+
 /* Finished state */
 #restart-link { display: none; }
 #chat-panel.finished #chat-input-bar { display: none; }
 #chat-panel.finished #restart-link { display: flex; }
+@media (max-width: 1023px) {
+    #chat-panel.finished #chat-messages { display: none; }
+    #chat-panel.finished {
+        flex: none;
+        min-height: 0;
+        overflow: visible;
+        border: none;
+    }
+}
 
 /* Illustration loading spinner */
 .illust-spin {

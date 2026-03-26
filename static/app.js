@@ -48,6 +48,7 @@ async function pollState() {
 
         if (state.finished) {
             document.getElementById("chat-panel").classList.add("finished");
+            document.getElementById("story-panel").classList.remove("story-pending");
 
             // Keep polling until the illustration is ready, then stop.
             if (!state.story.illustration_loading) {
@@ -72,7 +73,6 @@ function renderChat(messages) {
     if (messages.length === lastMessageCount) return;
     lastMessageCount = messages.length;
 
-    const restartLink = document.getElementById("restart-link");
     chatMessages.innerHTML = "";
     for (const msg of messages) {
         const div = document.createElement("div");
@@ -84,7 +84,6 @@ function renderChat(messages) {
         }
         chatMessages.appendChild(div);
     }
-    chatMessages.appendChild(restartLink);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
