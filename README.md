@@ -33,7 +33,7 @@ graph LR
 
 ## Why Temporal?
 
-Temporal brings [durable execution](https://temporal.io/durable-execution) to this project: the workflow state is automatically persisted, so the story creation process is resilient to failures without any custom recovery logic.
+Temporal brings [durable execution](https://temporal.io/how-temporal-works) to this project: the workflow state is automatically persisted, so the story creation process is resilient to failures without any custom recovery logic.
 
 Here are a few scenarios where Temporal makes a difference:
 
