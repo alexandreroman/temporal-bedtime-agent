@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import socket
 
 import structlog
 from pydantic_ai.durable_exec.temporal import PydanticAIPlugin
@@ -24,7 +25,8 @@ logger = structlog.get_logger("worker")
 
 
 async def main() -> None:
-    logger.info("Connecting to Temporal", address=TEMPORAL_ADDRESS)
+    identity = socket.gethostname()
+    logger.info("Connecting to Temporal", address=TEMPORAL_ADDRESS, identity=identity)
 
     client = await Client.connect(
         TEMPORAL_ADDRESS,
@@ -36,9 +38,10 @@ async def main() -> None:
         task_queue=TASK_QUEUE,
         workflows=[StorySessionWorkflow, GenerateIllustrationWorkflow],
         activities=[generate_illustration],
+        identity=identity,
     )
 
-    logger.info("Worker started", task_queue=TASK_QUEUE)
+    logger.info("Worker started", task_queue=TASK_QUEUE, identity=identity)
     await worker.run()
 
 

@@ -31,6 +31,17 @@ graph LR
 - **Temporal Server** — Orchestrates the story creation workflow with durable execution. It guarantees that workflows survive failures and restarts, and coordinates communication between the web UI and the worker.
 - **Worker** — Executes the workflows and activities. It drives the conversational flow, calls Claude Sonnet to generate story text, and calls OpenAI to generate illustrations.
 
+## Why Temporal?
+
+Temporal brings [durable execution](https://temporal.io/durable-execution) to this project: the workflow state is automatically persisted, so the story creation process is resilient to failures without any custom recovery logic.
+
+Here are a few scenarios where Temporal makes a difference:
+
+- **Worker crashes mid-story** — The user is chatting with the agent and the worker process crashes (OOM, deployment, bug). Without Temporal, the entire conversation and story progress would be lost. With Temporal, the workflow state is preserved: when the worker restarts, the conversation resumes exactly where it left off.
+- **LLM API timeout** — A call to Claude or OpenAI times out or returns a transient error. Temporal automatically retries the failed activity with configurable backoff, without duplicating work that already succeeded (e.g., the story text is not regenerated if only the illustration call failed).
+- **Long-running interaction** — A user starts a story, closes the browser, and comes back hours later. The workflow keeps waiting for the next user message; there is no session timeout to manage and no state to serialize to a database.
+- **Multiple workers** — In production, several worker instances can run in parallel. Temporal dispatches activities across workers and guarantees exactly-once execution, making the system horizontally scalable with no extra coordination code.
+
 ## Prerequisites
 
 - **Python 3.11+**

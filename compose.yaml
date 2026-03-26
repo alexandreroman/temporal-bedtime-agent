@@ -11,19 +11,33 @@ services:
       timeout: 10s
       retries: 3
 
-  worker:
-    build:
+  # Two separate worker services instead of deploy.replicas so that each
+  # instance gets a distinct hostname, visible in Temporal and in the logs.
+  worker-1:
+    container_name: worker-1
+    hostname: worker-1
+    build: &worker-build
       context: .
       dockerfile: Dockerfile.worker
     env_file: .env
-    environment:
+    environment: &worker-env
       - TEMPORAL_ADDRESS=temporal:7233
     restart: on-failure
-    depends_on:
+    depends_on: &worker-deps
       temporal:
         condition: service_healthy
-    volumes:
+    volumes: &worker-volumes
       - illustrations:/app/static/illustrations
+
+  worker-2:
+    container_name: worker-2
+    hostname: worker-2
+    build: *worker-build
+    env_file: .env
+    environment: *worker-env
+    restart: on-failure
+    depends_on: *worker-deps
+    volumes: *worker-volumes
 
   webui:
     build:
