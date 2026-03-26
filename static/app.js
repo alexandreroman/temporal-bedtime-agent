@@ -196,5 +196,12 @@ chatInput.addEventListener("keydown", (e) => {
     }
 });
 
+// Keep input bar visible above the virtual keyboard on mobile
+chatInput.addEventListener("focus", () => {
+    setTimeout(() => {
+        document.getElementById("chat-input-bar").scrollIntoView({ block: "end", behavior: "smooth" });
+    }, 300);
+});
+
 // Start or resume session on load
 initSession();
