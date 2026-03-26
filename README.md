@@ -4,6 +4,10 @@ An interactive bedtime story creation agent powered by [Temporal](https://tempor
 
 The agent guides you through a conversation to collaboratively create a personalized bedtime story, complete with AI-generated illustrations.
 
+![Story creation](story.png)
+
+![Temporal dashboard](temporal.png)
+
 ## Features
 
 - Conversational story creation (character, theme, special elements)
