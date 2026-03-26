@@ -19,9 +19,13 @@ graph LR
     A[Browser UI<br/>SPA] <-->|REST| B[FastAPI<br/>webui]
     B <--> C[Temporal Server]
     C <--> D[Temporal Worker<br/>workflows + activities]
-    D -->|Claude| E[Anthropic LLM]
-    D -->|DALL-E| F[OpenAI Image Gen]
+    D -->|Story text| E[LLM<br/>Claude Sonnet]
+    D -->|Illustration| F[OpenAI]
 ```
+
+- **Web UI (webui)** — FastAPI backend that serves the single-page app and exposes a REST API. It receives user messages and forwards them to Temporal as signals.
+- **Temporal Server** — Orchestrates the story creation workflow with durable execution. It guarantees that workflows survive failures and restarts, and coordinates communication between the web UI and the worker.
+- **Worker** — Executes the workflows and activities. It drives the conversational flow, calls Claude Sonnet to generate story text, and calls OpenAI to generate illustrations.
 
 ## Prerequisites
 
@@ -45,7 +49,7 @@ Edit `.env` and fill in your API keys:
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Anthropic API key (required) | — |
 | `OPENAI_API_KEY` | OpenAI API key for image generation (required) | — |
-| `PYDANTIC_AI_MODEL` | LLM model identifier | `anthropic:claude-sonnet-4-6-20250627` |
+| `PYDANTIC_AI_MODEL` | LLM model identifier | `anthropic:claude-sonnet-4-6` |
 | `PYDANTIC_AI_IMAGE_MODEL` | Image generation model | `openai-responses:gpt-image-1-mini` |
 | `TEMPORAL_ADDRESS` | Temporal server address | `localhost:7233` |
 | `TEMPORAL_TASK_QUEUE` | Temporal task queue name | `bedtime-story` |
