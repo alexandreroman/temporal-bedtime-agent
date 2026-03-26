@@ -40,16 +40,16 @@
                 </svg>
                 <a href="/" class="text-lg font-semibold tracking-tight hover:text-white">Bedtime Story Agent</a>
             </div>
-            <div class="flex items-center gap-2 hidden md:flex">
+            <div class="flex items-center gap-2 hidden lg:flex">
                 <p class="text-xs text-muted-dim uppercase tracking-wider">Durable Execution powered by</p>
                 <img src="/static/temporal-logo.png" alt="Temporal" class="h-8">
             </div>
         </div>
     </header>
 
-    <main class="flex flex-1 overflow-hidden h-[calc(100vh-53px)] max-md:flex-col">
+    <main class="flex flex-1 overflow-hidden h-[calc(100vh-53px)] max-lg:flex-col max-lg:overflow-y-auto">
 
-        <section id="chat-panel" class="flex-1 flex flex-col bg-surface-1 border-r border-edge min-w-0 max-w-[600px] overflow-hidden max-md:max-w-full max-md:h-[55vh] max-md:shrink-0 max-md:border-r-0 max-md:border-b max-md:border-edge">
+        <section id="chat-panel" class="flex-1 flex flex-col bg-surface-1 border-r border-edge min-w-0 max-w-[600px] overflow-hidden max-lg:max-w-full max-lg:min-h-[60vh] max-lg:border-r-0 max-lg:border-b max-lg:border-edge">
             <div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4 scrollbar-thin min-h-0" id="chat-messages">
                 <div id="restart-link" class="flex justify-center pt-1 pb-1">
                     <a href="/" class="flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent text-black font-medium text-sm no-underline transition-all hover:brightness-110 hover:scale-105 active:scale-95">
@@ -79,7 +79,7 @@
             </div>
         </section>
 
-        <section class="flex-1 overflow-y-auto py-8 px-10 bg-surface-2 min-w-0 min-h-0 scrollbar-thin max-md:h-[45vh] max-md:shrink-0 max-md:p-6">
+        <section class="flex-1 overflow-y-auto py-8 px-10 bg-surface-2 min-w-0 min-h-0 scrollbar-thin max-lg:min-h-[50vh] max-lg:p-6">
             <div id="story-placeholder" class="flex items-center justify-center h-full">
                 <div class="flex flex-col items-center gap-4">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#2D2D2D" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -90,7 +90,7 @@
                 </div>
             </div>
             <div id="story-content" style="display:none">
-                <h2 id="story-title" class="story-hidden font-serif text-3xl font-medium text-center mb-8 tracking-tight relative pb-4 after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-12 after:h-0.5 after:bg-accent after:rounded-full max-md:text-2xl"></h2>
+                <h2 id="story-title" class="story-hidden font-serif text-3xl font-medium text-center mb-8 tracking-tight relative pb-4 after:content-[''] after:absolute after:bottom-0 after:left-1/2 after:-translate-x-1/2 after:w-12 after:h-0.5 after:bg-accent after:rounded-full max-lg:text-2xl"></h2>
                 <div class="story-hidden flex justify-center mb-8">
                     <div id="story-illustration" class="w-[512px] h-[512px] max-w-full rounded-xl border border-edge">
                         <div id="illust-placeholder" class="h-full bg-surface-4 rounded-xl flex items-center justify-center p-6">
