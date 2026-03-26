@@ -14,17 +14,13 @@ The agent guides you through a conversation to collaboratively create a personal
 
 ## Architecture
 
-```
-┌─────────────┐       ┌─────────────┐       ┌──────────────────┐
-│  Browser UI  │◄─────►│  FastAPI     │◄─────►│  Temporal Server  │
-│  (SPA)       │  REST │  (webui)     │       │                  │
-└─────────────┘       └─────────────┘       └──────┬───────────┘
-                                                    │
-                                             ┌──────▼───────────┐
-                                             │  Temporal Worker  │
-                                             │  (workflows +     │
-                                             │   activities)     │
-                                             └──────────────────┘
+```mermaid
+graph LR
+    A[Browser UI<br/>SPA] <-->|REST| B[FastAPI<br/>webui]
+    B <--> C[Temporal Server]
+    C <--> D[Temporal Worker<br/>workflows + activities]
+    D -->|Claude| E[Anthropic LLM]
+    D -->|DALL-E| F[OpenAI Image Gen]
 ```
 
 ## Prerequisites
