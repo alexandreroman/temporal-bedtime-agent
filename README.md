@@ -52,13 +52,23 @@ Edit `.env` and fill in your API keys:
 | `WEBUI_HOST` | Web UI bind address | `0.0.0.0` |
 | `WEBUI_PORT` | Web UI port | `8000` |
 
-### 2. Install Dependencies
+### 2. Run with Docker Compose
+
+```bash
+docker-compose up --build
+```
+
+This starts the Temporal server, the worker, and the web UI. Open [http://localhost:8000](http://localhost:8000) to start creating a story, and [http://localhost:8233](http://localhost:8233) for the Temporal dashboard.
+
+### 3. Run without Docker
+
+#### Install Dependencies
 
 ```bash
 uv sync
 ```
 
-### 3. Run the Application
+#### Run the Application
 
 Start each command in a separate terminal:
 
@@ -76,6 +86,61 @@ uv run webui
 Then open [http://localhost:8000](http://localhost:8000) in your browser and start creating a bedtime story!
 
 > You need the [Temporal CLI](https://docs.temporal.io/cli) to run `temporal server start-dev`.
+
+## Development
+
+### Dev Workflow
+
+The recommended way to develop is to run each component separately so you get hot-reload and direct log output.
+
+```bash
+# 1. Install dependencies (including dev extras)
+uv sync
+
+# 2. Start the Temporal dev server (requires the Temporal CLI)
+temporal server start-dev
+
+# 3. Start the worker (auto-reloads on file changes via watchfiles)
+uv run worker
+
+# 4. Start the web UI (auto-reloads on file changes via uvicorn)
+uv run webui
+```
+
+Each command runs in its own terminal. The worker watches `worker/` and `webui/` directories; any saved change restarts it automatically. The web UI reloads on changes to `webui/` and `static/`.
+
+Open [http://localhost:8000](http://localhost:8000) for the app and [http://localhost:8233](http://localhost:8233) for the Temporal dashboard.
+
+### Debugging
+
+#### Temporal Dashboard
+
+The Temporal dev server exposes a web dashboard at [http://localhost:8233](http://localhost:8233) where you can:
+
+- List and inspect running/completed workflows
+- View workflow execution history (events, signals, queries)
+- Send signals or queries to a running workflow manually
+
+#### Logs
+
+Both the worker and the web UI use `structlog` with JSON output. Filter logs by component:
+
+```bash
+# Worker logs include events like "Connecting to Temporal", "Worker started"
+uv run worker 2>&1 | jq .
+
+# Web UI logs include events like "Creating session", "Message sent"
+uv run webui 2>&1 | jq .
+```
+
+#### Common Issues
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `Connection refused` on port 7233 | Temporal server not running | Start it with `temporal server start-dev` |
+| Worker starts but no workflows execute | Task queue mismatch | Check `TEMPORAL_TASK_QUEUE` matches in `.env` |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` errors | Missing or invalid API keys | Verify keys in `.env` |
+| Illustration not generated | OpenAI API key missing or model unavailable | Check `OPENAI_API_KEY` and `PYDANTIC_AI_IMAGE_MODEL` in `.env` |
 
 ## Project Structure
 
