@@ -10,8 +10,8 @@ from temporalio.worker import Worker
 
 from worker.activities import generate_illustration
 from worker.config import TASK_QUEUE, TEMPORAL_ADDRESS
-from worker.illustration_generation_workflow import GenerateIllustrationWorkflow
-from worker.story_session_workflow import StorySessionWorkflow
+from worker.workflow_illustration_generation import GenerateIllustrationWorkflow
+from worker.workflow_story_session import StorySessionWorkflow
 
 structlog.configure(
     processors=[

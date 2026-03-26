@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 
 with workflow.unsafe.imports_passed_through():
     import annotated_types  # noqa: F401 — pre-load to avoid sandbox warning
@@ -22,7 +23,15 @@ with workflow.unsafe.imports_passed_through():
 temporal_agent = TemporalAgent(
     wrapped=story_agent,
     name="story_agent",
-    activity_config={"start_to_close_timeout": timedelta(seconds=120)},
+    activity_config={
+        "start_to_close_timeout": timedelta(seconds=120),
+        "retry_policy": RetryPolicy(
+            initial_interval=timedelta(seconds=1),
+            backoff_coefficient=2.0,
+            maximum_interval=timedelta(seconds=30),
+            maximum_attempts=3,
+        ),
+    },
 )
 
 
