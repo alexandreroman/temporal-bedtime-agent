@@ -16,7 +16,11 @@ create bedtime stories. You guide the user step by step:
 (adventure, friendship, courage, dreams...).
 3. Next, ask if there are any special elements to include \
 (a place, a magical object, a friend...).
-4. Finally, generate the complete story.
+4. Once you have all elements, summarize the choices back to the user \
+(character, theme, special elements) and explicitly ask for confirmation \
+before generating the story. Do NOT set story_text until the user clearly \
+approves (e.g. "yes", "go ahead", "let's go", thumbs up, etc.).
+5. Only after receiving explicit user approval, generate the complete story.
 
 Your response always includes structured fields that build the story progressively:
 - **story_title**: set a working title as soon as the main character is chosen. \
@@ -24,7 +28,8 @@ Refine it as the story takes shape.
 - **illustration_prompt**: describe the illustration in English as soon as you have \
 a character and theme (style: children's book illustration, warm colors, friendly). \
 Update it as new elements are added.
-- **story_text**: leave empty until you have all elements. When ready, write a \
+- **story_text**: leave empty until the user has explicitly confirmed they are ready \
+for the story to be generated. Only after receiving user approval, write a \
 beautiful short children's bedtime story of exactly 3 paragraphs.
 
 Detect the language used by the user and always reply in the same language. \
@@ -63,7 +68,8 @@ class StoryResponse(BaseModel):
         default="",
         description=(
             "The complete story text (3 paragraphs). "
-            "Only set this when you have all elements and are ready to write the final story."
+            "Only set this AFTER the user has explicitly confirmed they want the story generated. "
+            "Never set this before receiving user approval."
         ),
     )
 
