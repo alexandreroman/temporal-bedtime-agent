@@ -23,13 +23,13 @@ graph LR
     A[Browser UI<br/>SPA] <-->|REST| B[FastAPI<br/>webui]
     B <--> C[Temporal Server]
     C <--> D[Temporal Worker<br/>workflows + activities]
-    D -->|Story text| E[LLM<br/>Claude Sonnet]
+    D -->|Story text| E[LLM<br/>OpenAI gpt-5.4-nano]
     D -->|Illustration| F[OpenAI]
 ```
 
 - **Web UI (webui)** — FastAPI backend that serves the single-page app and exposes a REST API. It receives user messages and forwards them to Temporal as signals.
 - **Temporal Server** — Orchestrates the story creation workflow with durable execution. It guarantees that workflows survive failures and restarts, and coordinates communication between the web UI and the worker.
-- **Worker** — Executes the workflows and activities. It drives the conversational flow, calls Claude Sonnet to generate story text, and calls OpenAI to generate illustrations.
+- **Worker** — Executes the workflows and activities. It drives the conversational flow, calls the configured LLM to generate story text, and calls OpenAI to generate illustrations.
 
 ## Why Temporal?
 
@@ -47,8 +47,8 @@ Here are a few scenarios where Temporal makes a difference:
 - **Python 3.11+**
 - **[uv](https://docs.astral.sh/uv/)** — fast Python package manager
 - **Temporal Server** running locally (see below)
-- **Anthropic API key** — for story generation (Claude)
-- **OpenAI API key** — for illustration generation (DALL-E)
+- **OpenAI API key** — for story generation (gpt-5.4-nano) and illustration generation
+- **Anthropic API key** — only if using an Anthropic model for story generation
 
 ## Getting Started
 
@@ -62,9 +62,9 @@ Edit `.env` and fill in your API keys:
 
 | Variable | Description | Default |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | Anthropic API key (required) | — |
-| `OPENAI_API_KEY` | OpenAI API key for image generation (required) | — |
-| `PYDANTIC_AI_MODEL` | LLM model identifier | `anthropic:claude-sonnet-4-6` |
+| `OPENAI_API_KEY` | OpenAI API key for LLM and image generation (required) | — |
+| `ANTHROPIC_API_KEY` | Anthropic API key (required only if using an Anthropic model) | — |
+| `PYDANTIC_AI_MODEL` | LLM model identifier | `openai:gpt-5.4-nano` |
 | `PYDANTIC_AI_IMAGE_MODEL` | Image generation model | `openai-responses:gpt-image-1-mini` |
 | `TEMPORAL_ADDRESS` | Temporal server address | `localhost:7233` |
 | `TEMPORAL_TASK_QUEUE` | Temporal task queue name | `bedtime-story` |
