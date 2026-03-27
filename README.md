@@ -79,6 +79,21 @@ docker-compose up --build
 
 This starts the Temporal server, the worker, and the web UI. Open [http://localhost:8000](http://localhost:8000) to start creating a story, and [http://localhost:8233](http://localhost:8233) for the Temporal dashboard.
 
+> **After changing `.env`**, recreate the worker containers so they pick up the new values.
+> For example, to switch the LLM provider from Anthropic to OpenAI, edit `.env`:
+>
+> ```env
+> PYDANTIC_AI_MODEL=openai:gpt-5.4-nano
+> ```
+>
+> Then recreate the workers:
+>
+> ```bash
+> docker-compose up --build -d worker-1 worker-2
+> ```
+>
+> Docker Compose only reads `.env` at container creation time, so a simple `docker-compose restart` is **not** enough — you need to recreate the containers.
+
 ### 3. Run without Docker
 
 #### Install Dependencies
