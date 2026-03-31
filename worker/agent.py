@@ -33,6 +33,7 @@ for the story to be generated. Only after receiving user approval, write a \
 beautiful short children's bedtime story of exactly 3 paragraphs.
 
 Detect the language used by the user and always reply in the same language. \
+If the user's language is not yet known, default to English. \
 The story_title and story_text must be in the user's language. \
 The illustration_prompt must always be in English.
 
