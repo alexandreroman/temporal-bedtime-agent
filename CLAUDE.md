@@ -14,6 +14,10 @@ The worker and webui logs are in JSON format (via structlog). Use `jq` or simila
 
 Do not use compound commands (`&&`) in Bash tool calls. Run each command separately instead.
 
+## Temporal workflows
+
+Use the `temporal` CLI to analyze or debug Temporal workflows (e.g. `temporal workflow list`, `temporal workflow describe`, `temporal workflow show`).
+
 ## Language
 
 All generated text (code comments, commit messages, documentation, PR descriptions, etc.) must be written in English.
