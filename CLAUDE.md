@@ -10,6 +10,10 @@ Always use `docker-compose` (hyphenated) instead of `docker compose` (space-sepa
 
 The worker and webui logs are in JSON format (via structlog). Use `jq` or similar tools to filter and analyze log output.
 
+## Bash usage
+
+Do not use compound commands (`&&`) in Bash tool calls. Run each command separately instead.
+
 ## Language
 
 All generated text (code comments, commit messages, documentation, PR descriptions, etc.) must be written in English.
