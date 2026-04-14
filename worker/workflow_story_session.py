@@ -27,12 +27,11 @@ temporal_agent = TemporalAgent(
     wrapped=story_agent,
     name="story_agent",
     activity_config={
-        "start_to_close_timeout": timedelta(seconds=120),
+        "start_to_close_timeout": timedelta(seconds=60),
         "retry_policy": RetryPolicy(
             initial_interval=timedelta(seconds=1),
-            backoff_coefficient=2.0,
-            maximum_interval=timedelta(seconds=30),
-            maximum_attempts=3,
+            backoff_coefficient=1.5,
+            maximum_interval=timedelta(seconds=5),
         ),
     },
 )
