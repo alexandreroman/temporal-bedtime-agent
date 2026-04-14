@@ -25,3 +25,4 @@ class SessionState(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     story: Story = Field(default_factory=Story)
     finished: bool = False
+    illustration_workflow_id: str = ""

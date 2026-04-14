@@ -113,27 +113,27 @@ function renderStory(story) {
     const loaderEl = document.getElementById("illust-loader");
     const placeholderEl = document.getElementById("illust-placeholder");
     const illustrationWrapper = illustrationEl.parentElement;
+    const existingImg = illustrationEl.querySelector("img");
 
-    if (story.illustration_url && !illustrationEl.querySelector("img")) {
-        placeholderEl.style.display = "none";
-        loaderEl.style.display = "none";
+    function revealIllustration(showPlaceholder, showLoader) {
+        placeholderEl.style.display = showPlaceholder ? "" : "none";
+        loaderEl.style.display = showLoader ? "" : "none";
+        illustrationWrapper.classList.remove("story-hidden");
+        illustrationWrapper.classList.add("story-reveal");
+    }
+
+    if (story.illustration_loading) {
+        if (existingImg) existingImg.remove();
+        revealIllustration(false, true);
+    } else if (!existingImg && story.illustration_url) {
         const img = document.createElement("img");
         img.src = story.illustration_url;
         img.alt = "Story illustration";
         img.className = "w-full rounded-xl";
         illustrationEl.appendChild(img);
-        illustrationWrapper.classList.remove("story-hidden");
-        illustrationWrapper.classList.add("story-reveal");
-    } else if (story.illustration_loading) {
-        placeholderEl.style.display = "none";
-        loaderEl.style.display = "";
-        illustrationWrapper.classList.remove("story-hidden");
-        illustrationWrapper.classList.add("story-reveal");
-    } else if (story.title) {
-        placeholderEl.style.display = "";
-        loaderEl.style.display = "none";
-        illustrationWrapper.classList.remove("story-hidden");
-        illustrationWrapper.classList.add("story-reveal");
+        revealIllustration(false, false);
+    } else if (!existingImg && story.title) {
+        revealIllustration(true, false);
     }
 
     if (story.text) {

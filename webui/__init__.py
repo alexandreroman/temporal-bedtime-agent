@@ -45,42 +45,24 @@ async def get_client() -> Client:
 
 
 # ---------------------------------------------------------------------------
-# Illustration — one independent workflow per story session
+# Illustration — poll the child workflow started by StorySessionWorkflow
 # ---------------------------------------------------------------------------
 
-def _illustration_workflow_id(session_id: str) -> str:
-    return f"{session_id}-illustration"
+async def _poll_illustration(client: Client, workflow_id: str) -> str:
+    """Poll an illustration workflow and return its URL when complete.
 
-
-async def _sync_illustration(
-    client: Client, session_id: str, illustration_prompt: str
-) -> str:
-    """Start or poll the illustration workflow for *session_id*.
-
-    All state lives in Temporal — no in-memory cache needed.
-    Returns the illustration URL if available, empty string otherwise.
+    The illustration workflow is started by the story workflow as a child,
+    so this function only checks status — it never starts a workflow.
+    Returns the illustration URL if the workflow completed, empty string otherwise.
     """
-    workflow_id = _illustration_workflow_id(session_id)
     handle = client.get_workflow_handle(workflow_id)
 
     try:
         desc = await handle.describe()
     except RPCError as e:
-        if e.status != RPCStatusCode.NOT_FOUND:
-            raise
-        # Workflow does not exist yet — start it
-        logger.info(
-            "Starting illustration workflow",
-            session_id=session_id,
-            workflow_id=workflow_id,
-        )
-        await client.start_workflow(
-            "GenerateIllustrationWorkflow",
-            {"prompt": illustration_prompt, "story_id": session_id},
-            id=workflow_id,
-            task_queue=TASK_QUEUE,
-        )
-        return ""
+        if e.status == RPCStatusCode.NOT_FOUND:
+            return ""
+        raise
 
     if desc.status == WorkflowExecutionStatus.COMPLETED:
         return await handle.result()
@@ -139,23 +121,18 @@ async def get_session_state(session_id: str) -> SessionState:
         logger.error("Failed to get session state", session_id=session_id, error=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
-    # Illustration generation is triggered lazily: on each poll, the webui
-    # checks if the story is complete and starts/polls the illustration
-    # workflow. This avoids a tight coupling between the two workflows.
-    has_prompt = bool(worker_state.story.illustration_prompt)
-    story_ready = bool(worker_state.story.text)
-
+    # The story workflow starts the illustration as a child workflow
+    # once the story is approved.  The webui only polls its status.
+    illustration_wf_id = worker_state.illustration_workflow_id
     illustration_url = ""
-    if has_prompt and story_ready:
+    if illustration_wf_id:
         try:
-            illustration_url = await _sync_illustration(
-                client, session_id, worker_state.story.illustration_prompt
-            )
+            illustration_url = await _poll_illustration(client, illustration_wf_id)
         except Exception as e:
-            logger.error("Illustration sync failed", session_id=session_id, error=str(e))
+            logger.error("Illustration poll failed", session_id=session_id, error=str(e))
 
     # True while the illustration workflow is running but hasn't completed yet.
-    illustration_loading = has_prompt and story_ready and not illustration_url
+    illustration_loading = bool(illustration_wf_id) and not illustration_url
 
     return SessionState(
         session_id=session_id,

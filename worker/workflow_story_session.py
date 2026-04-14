@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from temporalio import workflow
 from temporalio.common import RetryPolicy
+from temporalio.workflow import ParentClosePolicy
 
 # Temporal's workflow sandbox restricts imports to enforce determinism.
 # `imports_passed_through()` lets these non-deterministic libraries bypass
@@ -14,6 +15,7 @@ with workflow.unsafe.imports_passed_through():
     from pydantic_ai.durable_exec.temporal import TemporalAgent
     from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 
+    from worker.activities import GenerateIllustrationInput
     from worker.agent import StoryResponse, story_agent
     from worker.models import (
         ChatMessage,
@@ -21,6 +23,7 @@ with workflow.unsafe.imports_passed_through():
         SessionState,
         Story,
     )
+    from worker.workflow_illustration_generation import GenerateIllustrationWorkflow
 
 # Wrap the pydantic-ai agent for Temporal: LLM calls become activities.
 temporal_agent = TemporalAgent(
@@ -51,6 +54,8 @@ class StorySessionWorkflow:
         # and the main loop picks it up via wait_condition().
         self._pending_user_message: str | None = None
         self._processing: bool = False
+        # Illustration child workflow — started once the story is approved.
+        self._illustration_workflow_id: str = ""
 
     def _apply_result(self, response: StoryResponse) -> None:
         """Extract story fields from the structured response and update state."""
@@ -109,8 +114,29 @@ class StorySessionWorkflow:
             self._apply_result(result.output)
             self._processing = False
 
+            # Start illustration as soon as the story is approved — all
+            # elements are finalized and the prompt is definitive.
+            if self._finished and self._story.illustration_prompt:
+                await self._start_illustration()
+
         # Return the final state as the workflow result
         return self._build_state()
+
+    async def _start_illustration(self) -> None:
+        """Start the illustration child workflow."""
+        self._illustration_workflow_id = (
+            f"{workflow.info().workflow_id}-illustration"
+        )
+        await workflow.start_child_workflow(
+            GenerateIllustrationWorkflow.run,
+            GenerateIllustrationInput(
+                prompt=self._story.illustration_prompt,
+                story_id=workflow.info().workflow_id,
+            ),
+            id=self._illustration_workflow_id,
+            task_queue=workflow.info().task_queue,
+            parent_close_policy=ParentClosePolicy.ABANDON,
+        )
 
     @workflow.signal
     async def send_message(self, message: str) -> None:
@@ -119,12 +145,9 @@ class StorySessionWorkflow:
     def _build_state(self) -> SessionState:
         return SessionState(
             messages=list(self._messages),
-            story=Story(
-                title=self._story.title,
-                illustration_prompt=self._story.illustration_prompt,
-                text=self._story.text,
-            ),
+            story=self._story.model_copy(),
             finished=self._finished,
+            illustration_workflow_id=self._illustration_workflow_id,
         )
 
     @workflow.query
