@@ -23,7 +23,7 @@ graph LR
     A[Browser UI<br/>SPA] <-->|REST| B[FastAPI<br/>webui]
     B <--> C[Temporal Server]
     C <--> D[Temporal Worker<br/>workflows + activities]
-    D -->|Story text| E[LLM<br/>OpenAI gpt-5.4-nano]
+    D -->|Story text| E[LLM<br/>OpenAI gpt-5.4-mini]
     D -->|Illustration| F[OpenAI Images API<br/>gpt-image-2]
 ```
 
@@ -47,7 +47,7 @@ Here are a few scenarios where Temporal makes a difference:
 - **Python 3.11+**
 - **[uv](https://docs.astral.sh/uv/)** — fast Python package manager
 - **Temporal Server** running locally (see below)
-- **OpenAI API key** — for story generation (gpt-5.4-nano) and illustration generation
+- **OpenAI API key** — for story generation (gpt-5.4-mini) and illustration generation
 - **Anthropic API key** — only if using an Anthropic model for story generation
 
 ## Getting Started
@@ -64,7 +64,7 @@ Edit `.env` and fill in your API keys:
 |-----------------------|-----------------------------------------------------------------------------------------------------------------------------------|-----------------------|
 | `OPENAI_API_KEY`      | OpenAI API key for LLM and image generation (required)                                                                            | —                     |
 | `ANTHROPIC_API_KEY`   | Anthropic API key (required only if using an Anthropic model)                                                                     | —                     |
-| `PYDANTIC_AI_MODEL`   | LLM model identifier. Examples: `openai:gpt-5.4-nano` (OpenAI GPT Nano), `anthropic:claude-sonnet-4-6` (Claude Sonnet)            | `openai:gpt-5.4-nano` |
+| `PYDANTIC_AI_MODEL`   | LLM model identifier. Examples: `openai:gpt-5.4-mini` (OpenAI GPT Mini), `anthropic:claude-sonnet-4-6` (Claude Sonnet)            | `openai:gpt-5.4-mini` |
 | `OPENAI_IMAGE_MODEL`  | OpenAI image generation model (see [note below](#image-model-and-organization-verification))                                      | `gpt-image-2`         |
 | `TEMPORAL_ADDRESS`    | Temporal server address                                                                                                           | `localhost:7233`      |
 | `TEMPORAL_TASK_QUEUE` | Temporal task queue name                                                                                                          | `bedtime-story`       |
@@ -98,7 +98,7 @@ This starts the Temporal server, the worker, and the web UI. Open [http://localh
 > For example, to switch the LLM provider from Anthropic to OpenAI, edit `.env`:
 >
 > ```env
-> PYDANTIC_AI_MODEL=openai:gpt-5.4-nano
+> PYDANTIC_AI_MODEL=openai:gpt-5.4-mini
 > ```
 >
 > Then recreate the workers:

@@ -16,7 +16,7 @@ with workflow.unsafe.imports_passed_through():
     from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 
     from worker.activities import GenerateIllustrationInput
-    from worker.agent import StoryResponse, story_agent
+    from worker.agent import story_agent
     from worker.models import (
         ChatMessage,
         Role,
@@ -37,6 +37,42 @@ temporal_agent = TemporalAgent(
             maximum_interval=timedelta(seconds=5),
         ),
     },
+)
+
+# Per-turn scaffolding injected into the user prompt to keep the 5-turn flow
+# on track. Hints are only attached to the current call; they are never
+# persisted into self._messages or the conversation history.
+_TURN_HINTS: dict[int, str] = {
+    1: "[Turn 1] Greet warmly and ask who the main CHARACTER will be. Offer 3–4 story-level bullets. No user input yet → reply in English.",
+    2: "[Turn 2] Ask the QUEST — what the character DOES (searches, helps, faces, explores). Offer 3–4 story-level bullets.",
+    3: "[Turn 3] Ask for ONE last ingredient: companion, magical object, or ending. Offer 3–4 story-level bullets.",
+    4: "[Turn 4] RECAP all ingredients as a bullet list and end with a single yes/no question. No other questions. Keep story_text EMPTY.",
+}
+
+# Used for every turn after the recap (turn 5, 6, 7...). The conversation
+# stays open until the user actually approves.
+_POST_RECAP_HINT = (
+    "[Turn 5+] The recap has been shown; the user just replied. Pick ONE branch:\n"
+    "\n"
+    "BRANCH A — APPROVAL (generate now). The reply is a pure short affirmative "
+    "with NO story content: 'ok', 'yes', 'oui', 'vas-y', 'd'accord', 'parfait', "
+    "'allons-y', 'sí', 'ja', 👍, or a combination ('OK vas-y', 'oui parfait'). "
+    "Action: fill `story_text` with a COMPLETE 3-paragraph story in the user's "
+    "language RIGHT NOW; `message` = ONE warm sentence (no question, no story "
+    "content). Saying 'I'll write it' without filling `story_text` is a bug.\n"
+    "\n"
+    "BRANCH B — CHANGE REQUEST. The user wants to swap an element ('plutôt un "
+    "cristal', 'rather…', 'actually…'). Update it, show a fresh recap, re-ask "
+    "the yes/no question. Keep `story_text` EMPTY.\n"
+    "\n"
+    "BRANCH C — EXTRA DETAIL. The user adds a name, place, mood, twist, or "
+    "event ('à la fin il X', 'il fait nuit', 'Tim le chat l'accompagne'). "
+    "Absorb it, show a fresh full recap with the new detail, re-ask the "
+    "yes/no question. Keep `story_text` EMPTY.\n"
+    "\n"
+    "Rule of thumb: any story content (place, time, mood, character, action, "
+    "item, twist, 'plutôt') → Branch B/C. No content + short affirmative → "
+    "Branch A. Never Branch A for content-bearing replies."
 )
 
 
@@ -61,9 +97,17 @@ class StorySessionWorkflow:
         self, prompt: str, message_history: list[ModelMessage] | None = None
     ) -> None:
         """Invoke the agent and apply its response to workflow state."""
+        # Turns 1–4 follow a fixed script; turn 5+ is adaptive (approve /
+        # change / add detail) until the user explicitly greenlights.
+        turn = sum(1 for m in self._messages if m.role == Role.ASSISTANT) + 1
+        hint = _TURN_HINTS.get(turn, _POST_RECAP_HINT)
+        prompt_with_hint = f"{hint}\n\n{prompt}"
+
         self._processing = True
         try:
-            result = await temporal_agent.run(prompt, message_history=message_history)
+            result = await temporal_agent.run(
+                prompt_with_hint, message_history=message_history
+            )
         finally:
             self._processing = False
 
@@ -93,7 +137,9 @@ class StorySessionWorkflow:
             if self._finished:
                 break
 
-            user_msg = self._pending_user_message
+            # wait_condition above guarantees this is non-None.
+            assert self._pending_user_message is not None
+            user_msg: str = self._pending_user_message
             self._pending_user_message = None
 
             # Rebuild pydantic-ai message history from prior turns so the LLM
