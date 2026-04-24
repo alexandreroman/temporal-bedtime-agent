@@ -60,16 +60,16 @@ cp .env-sample .env
 
 Edit `.env` and fill in your API keys:
 
-| Variable              | Description                                                                                  | Default               |
-|-----------------------|----------------------------------------------------------------------------------------------|-----------------------|
-| `OPENAI_API_KEY`      | OpenAI API key for LLM and image generation (required)                                       | —                     |
-| `ANTHROPIC_API_KEY`   | Anthropic API key (required only if using an Anthropic model)                                | —                     |
-| `PYDANTIC_AI_MODEL`   | LLM model identifier                                                                         | `openai:gpt-5.4-nano` |
-| `OPENAI_IMAGE_MODEL`  | OpenAI image generation model (see [note below](#image-model-and-organization-verification)) | `gpt-image-2`         |
-| `TEMPORAL_ADDRESS`    | Temporal server address                                                                      | `localhost:7233`      |
-| `TEMPORAL_TASK_QUEUE` | Temporal task queue name                                                                     | `bedtime-story`       |
-| `WEBUI_HOST`          | Web UI bind address                                                                          | `0.0.0.0`             |
-| `WEBUI_PORT`          | Web UI port                                                                                  | `8000`                |
+| Variable              | Description                                                                                                                       | Default               |
+|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------|-----------------------|
+| `OPENAI_API_KEY`      | OpenAI API key for LLM and image generation (required)                                                                            | —                     |
+| `ANTHROPIC_API_KEY`   | Anthropic API key (required only if using an Anthropic model)                                                                     | —                     |
+| `PYDANTIC_AI_MODEL`   | LLM model identifier. Examples: `openai:gpt-5.4-nano` (OpenAI GPT Nano), `anthropic:claude-sonnet-4-6` (Claude Sonnet)            | `openai:gpt-5.4-nano` |
+| `OPENAI_IMAGE_MODEL`  | OpenAI image generation model (see [note below](#image-model-and-organization-verification))                                      | `gpt-image-2`         |
+| `TEMPORAL_ADDRESS`    | Temporal server address                                                                                                           | `localhost:7233`      |
+| `TEMPORAL_TASK_QUEUE` | Temporal task queue name                                                                                                          | `bedtime-story`       |
+| `WEBUI_HOST`          | Web UI bind address                                                                                                               | `0.0.0.0`             |
+| `WEBUI_PORT`          | Web UI port                                                                                                                       | `8000`                |
 
 #### Image model and organization verification
 
