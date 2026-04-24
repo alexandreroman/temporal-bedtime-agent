@@ -12,9 +12,7 @@ PYDANTIC_AI_MODEL: str = os.environ.get(
     "PYDANTIC_AI_MODEL", "anthropic:claude-sonnet-4-6"
 )
 
-PYDANTIC_AI_IMAGE_MODEL: str = os.environ.get(
-    "PYDANTIC_AI_IMAGE_MODEL", "openai-responses:gpt-5.4-nano"
-)
+OPENAI_IMAGE_MODEL: str = os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-2")
 
 TEMPORAL_ADDRESS: str = os.environ.get("TEMPORAL_ADDRESS", "localhost:7233")
 TASK_QUEUE: str = os.environ.get("TEMPORAL_TASK_QUEUE", "bedtime-story")

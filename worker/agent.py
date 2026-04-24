@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent, BinaryImage, ImageGenerationTool
-from pydantic_ai.models import infer_model
-from pydantic_ai.profiles.openai import OpenAIModelProfile
+from pydantic_ai import Agent
 
-from worker.config import PYDANTIC_AI_IMAGE_MODEL, PYDANTIC_AI_MODEL
+from worker.config import PYDANTIC_AI_MODEL
 
 SYSTEM_PROMPT = """\
 You are **Bedtime Story Agent**, a friendly assistant who helps parents and children \
@@ -79,21 +77,4 @@ story_agent: Agent[None, StoryResponse] = Agent(
     model=PYDANTIC_AI_MODEL,
     system_prompt=SYSTEM_PROMPT,
     output_type=StoryResponse,
-)
-
-# The image model needs an explicit profile override because pydantic-ai
-# cannot auto-detect image output support from the model string alone.
-_image_model = infer_model(PYDANTIC_AI_IMAGE_MODEL)
-_image_model.profile = OpenAIModelProfile(supports_image_output=True)
-
-illustration_agent: Agent[None, BinaryImage] = Agent(
-    model=_image_model,
-    builtin_tools=[
-        ImageGenerationTool(
-            output_format="png",
-            quality="low",
-            size="1024x1024",
-        )
-    ],
-    output_type=BinaryImage,
 )

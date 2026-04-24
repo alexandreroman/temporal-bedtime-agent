@@ -48,12 +48,14 @@ async def get_client() -> Client:
 # Illustration — poll the child workflow started by StorySessionWorkflow
 # ---------------------------------------------------------------------------
 
-async def _poll_illustration(client: Client, workflow_id: str) -> str:
-    """Poll an illustration workflow and return its URL when complete.
+async def _poll_illustration(
+    client: Client, workflow_id: str
+) -> tuple[str, bool, bool]:
+    """Poll an illustration workflow.
 
-    The illustration workflow is started by the story workflow as a child,
-    so this function only checks status — it never starts a workflow.
-    Returns the illustration URL if the workflow completed, empty string otherwise.
+    Returns (url, still_running, failed). The illustration workflow is started
+    by the story workflow as a child, so this function only checks status —
+    it never starts a workflow.
     """
     handle = client.get_workflow_handle(workflow_id)
 
@@ -61,13 +63,14 @@ async def _poll_illustration(client: Client, workflow_id: str) -> str:
         desc = await handle.describe()
     except RPCError as e:
         if e.status == RPCStatusCode.NOT_FOUND:
-            return ""
+            return "", False, False
         raise
 
     if desc.status == WorkflowExecutionStatus.COMPLETED:
-        return await handle.result()
-
-    return ""
+        return await handle.result(), False, False
+    if desc.status == WorkflowExecutionStatus.RUNNING:
+        return "", True, False
+    return "", False, True
 
 
 # ---------------------------------------------------------------------------
@@ -125,14 +128,17 @@ async def get_session_state(session_id: str) -> SessionState:
     # once the story is approved.  The webui only polls its status.
     illustration_wf_id = worker_state.illustration_workflow_id
     illustration_url = ""
+    illustration_loading = False
+    illustration_failed = False
     if illustration_wf_id:
         try:
-            illustration_url = await _poll_illustration(client, illustration_wf_id)
+            (
+                illustration_url,
+                illustration_loading,
+                illustration_failed,
+            ) = await _poll_illustration(client, illustration_wf_id)
         except Exception as e:
             logger.error("Illustration poll failed", session_id=session_id, error=str(e))
-
-    # True while the illustration workflow is running but hasn't completed yet.
-    illustration_loading = bool(illustration_wf_id) and not illustration_url
 
     return SessionState(
         session_id=session_id,
@@ -141,6 +147,7 @@ async def get_session_state(session_id: str) -> SessionState:
             title=worker_state.story.title,
             illustration_url=illustration_url,
             illustration_loading=illustration_loading,
+            illustration_failed=illustration_failed,
             text=worker_state.story.text,
         ),
         finished=worker_state.finished,

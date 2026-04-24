@@ -94,7 +94,7 @@ function renderStory(story) {
     const illustrationEl = document.getElementById("story-illustration");
     const textEl = document.getElementById("story-text");
 
-    if (!story.title && !story.text && !story.illustration_url && !story.illustration_loading) {
+    if (!story.title && !story.text && !story.illustration_url && !story.illustration_loading && !story.illustration_failed) {
         placeholder.style.display = "flex";
         content.style.display = "none";
         return;
@@ -111,29 +111,34 @@ function renderStory(story) {
     }
 
     const loaderEl = document.getElementById("illust-loader");
+    const errorEl = document.getElementById("illust-error");
     const placeholderEl = document.getElementById("illust-placeholder");
     const illustrationWrapper = illustrationEl.parentElement;
     const existingImg = illustrationEl.querySelector("img");
 
-    function revealIllustration(showPlaceholder, showLoader) {
+    function revealIllustration(showPlaceholder, showLoader, showError) {
         placeholderEl.style.display = showPlaceholder ? "" : "none";
         loaderEl.style.display = showLoader ? "" : "none";
+        errorEl.style.display = showError ? "" : "none";
         illustrationWrapper.classList.remove("story-hidden");
         illustrationWrapper.classList.add("story-reveal");
     }
 
     if (story.illustration_loading) {
         if (existingImg) existingImg.remove();
-        revealIllustration(false, true);
+        revealIllustration(false, true, false);
+    } else if (story.illustration_failed) {
+        if (existingImg) existingImg.remove();
+        revealIllustration(false, false, true);
     } else if (!existingImg && story.illustration_url) {
         const img = document.createElement("img");
         img.src = story.illustration_url;
         img.alt = "Story illustration";
         img.className = "w-full rounded-xl";
         illustrationEl.appendChild(img);
-        revealIllustration(false, false);
+        revealIllustration(false, false, false);
     } else if (!existingImg && story.title) {
-        revealIllustration(true, false);
+        revealIllustration(true, false, false);
     }
 
     if (story.text) {

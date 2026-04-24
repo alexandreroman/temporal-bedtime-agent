@@ -24,7 +24,7 @@ graph LR
     B <--> C[Temporal Server]
     C <--> D[Temporal Worker<br/>workflows + activities]
     D -->|Story text| E[LLM<br/>OpenAI gpt-5.4-nano]
-    D -->|Illustration| F[OpenAI]
+    D -->|Illustration| F[OpenAI Images API<br/>gpt-image-2]
 ```
 
 - **Web UI (webui)** — FastAPI backend that serves the single-page app and exposes a REST API. It receives user messages and forwards them to Temporal as signals.
@@ -60,16 +60,31 @@ cp .env-sample .env
 
 Edit `.env` and fill in your API keys:
 
-| Variable | Description | Default |
-|---|---|---|
-| `OPENAI_API_KEY` | OpenAI API key for LLM and image generation (required) | — |
-| `ANTHROPIC_API_KEY` | Anthropic API key (required only if using an Anthropic model) | — |
-| `PYDANTIC_AI_MODEL` | LLM model identifier | `openai:gpt-5.4-nano` |
-| `PYDANTIC_AI_IMAGE_MODEL` | Image generation model | `openai-responses:gpt-image-1-mini` |
-| `TEMPORAL_ADDRESS` | Temporal server address | `localhost:7233` |
-| `TEMPORAL_TASK_QUEUE` | Temporal task queue name | `bedtime-story` |
-| `WEBUI_HOST` | Web UI bind address | `0.0.0.0` |
-| `WEBUI_PORT` | Web UI port | `8000` |
+| Variable              | Description                                                                                  | Default               |
+|-----------------------|----------------------------------------------------------------------------------------------|-----------------------|
+| `OPENAI_API_KEY`      | OpenAI API key for LLM and image generation (required)                                       | —                     |
+| `ANTHROPIC_API_KEY`   | Anthropic API key (required only if using an Anthropic model)                                | —                     |
+| `PYDANTIC_AI_MODEL`   | LLM model identifier                                                                         | `openai:gpt-5.4-nano` |
+| `OPENAI_IMAGE_MODEL`  | OpenAI image generation model (see [note below](#image-model-and-organization-verification)) | `gpt-image-2`         |
+| `TEMPORAL_ADDRESS`    | Temporal server address                                                                      | `localhost:7233`      |
+| `TEMPORAL_TASK_QUEUE` | Temporal task queue name                                                                     | `bedtime-story`       |
+| `WEBUI_HOST`          | Web UI bind address                                                                          | `0.0.0.0`             |
+| `WEBUI_PORT`          | Web UI port                                                                                  | `8000`                |
+
+#### Image model and organization verification
+
+The default image model `gpt-image-2` (ChatGPT Images 2.0) **requires a verified OpenAI organization**. If your organization is not verified, illustration generation will fail with:
+
+> Your organization must be verified to use the model `gpt-image-2`.
+
+You have two options:
+
+1. **Verify your organization** on [platform.openai.com/settings/organization/general](https://platform.openai.com/settings/organization/general). Access propagates within ~15 minutes.
+2. **Use `gpt-image-1.5` instead**, which works without verification. Set this in your `.env`:
+
+   ```env
+   OPENAI_IMAGE_MODEL=gpt-image-1.5
+   ```
 
 ### 2. Run with Docker Compose
 
@@ -169,12 +184,13 @@ uv run webui 2>&1 | jq .
 
 #### Common Issues
 
-| Symptom | Cause | Fix |
-|---|---|---|
-| `Connection refused` on port 7233 | Temporal server not running | Start it with `temporal server start-dev` |
-| Worker starts but no workflows execute | Task queue mismatch | Check `TEMPORAL_TASK_QUEUE` matches in `.env` |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` errors | Missing or invalid API keys | Verify keys in `.env` |
-| Illustration not generated | OpenAI API key missing or model unavailable | Check `OPENAI_API_KEY` and `PYDANTIC_AI_IMAGE_MODEL` in `.env` |
+| Symptom                                                             | Cause                                        | Fix                                                                                                                                      |
+|---------------------------------------------------------------------|----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `Connection refused` on port 7233                                   | Temporal server not running                  | Start it with `temporal server start-dev`                                                                                                |
+| Worker starts but no workflows execute                              | Task queue mismatch                          | Check `TEMPORAL_TASK_QUEUE` matches in `.env`                                                                                            |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` errors                       | Missing or invalid API keys                  | Verify keys in `.env`                                                                                                                    |
+| Illustration not generated                                          | OpenAI API key missing or model unavailable  | Check `OPENAI_API_KEY` and `OPENAI_IMAGE_MODEL` in `.env`                                                                                |
+| `Your organization must be verified to use the model 'gpt-image-2'` | Default model requires a verified OpenAI org | Either [verify your org](https://platform.openai.com/settings/organization/general), or set `OPENAI_IMAGE_MODEL=gpt-image-1.5` in `.env` |
 
 ## Project Structure
 

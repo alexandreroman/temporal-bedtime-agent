@@ -9,6 +9,7 @@ class Story(BaseModel):
     title: str = ""
     illustration_url: str = ""
     illustration_loading: bool = False
+    illustration_failed: bool = False
     text: str = ""
 
 
