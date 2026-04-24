@@ -1,6 +1,11 @@
 let sessionId = null;
 let polling = null;
 let lastMessageCount = 0;
+// Minimum server-side message count required before the input is safe to
+// re-enable. Raised by sendMessage() and checked in pollState() so a poll
+// catching stale state (processing=false before the workflow picks up the
+// signal) cannot unlock the input before the assistant reply has arrived.
+let expectedMessageCount = 0;
 
 const chatMessages = document.getElementById("chat-messages");
 const chatInput = document.getElementById("chat-input");
@@ -55,7 +60,7 @@ async function pollState() {
             if (!state.story.illustration_loading) {
                 clearInterval(polling);
             }
-        } else if (!state.processing) {
+        } else if (!state.processing && state.messages.length >= expectedMessageCount) {
             setInputEnabled(true);
         }
     } catch (e) {
@@ -170,6 +175,10 @@ async function sendMessage() {
     if (!message || !sessionId) return;
 
     chatInput.value = "";
+    // The send adds a user message and expects an assistant reply, so we
+    // require the server to reach at least +2 messages before the input
+    // is re-enabled.
+    expectedMessageCount = lastMessageCount + 2;
     setInputEnabled(false);
 
     // Optimistically render the user message before the server round-trip.
@@ -182,11 +191,20 @@ async function sendMessage() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
     lastMessageCount++;
 
-    await fetch(`/api/sessions/${sessionId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message }),
-    });
+    try {
+        await fetch(`/api/sessions/${sessionId}/messages`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message }),
+        });
+    } catch (e) {
+        console.error("Send failed:", e);
+        // Rollback the optimistic state so the user can retry.
+        expectedMessageCount = lastMessageCount - 1;
+        lastMessageCount--;
+        div.remove();
+        setInputEnabled(true);
+    }
 }
 
 chatInput.addEventListener("keydown", (e) => {
