@@ -30,10 +30,7 @@ async def main() -> None:
 
     # PydanticAIPlugin integrates pydantic-ai with Temporal by converting
     # LLM calls into replayable activities for durable execution.
-    client = await Client.connect(
-        TEMPORAL_ADDRESS,
-        plugins=[PydanticAIPlugin()],
-    )
+    client = await Client.connect(TEMPORAL_ADDRESS, plugins=[PydanticAIPlugin()])
 
     worker = Worker(
         client,
@@ -47,7 +44,7 @@ async def main() -> None:
     await worker.run()
 
 
-def _run_worker() -> None:
+def _entrypoint() -> None:
     asyncio.run(main())
 
 
@@ -55,4 +52,4 @@ def run() -> None:
     """Start the worker with hot-reload: restarts on any file change in worker/ or webui/."""
     from watchfiles import run_process
 
-    run_process("worker", "webui", target=_run_worker)
+    run_process("worker", "webui", target=_entrypoint)

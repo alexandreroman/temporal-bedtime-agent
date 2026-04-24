@@ -45,6 +45,7 @@ async function pollState() {
         const state = await res.json();
         renderChat(state.messages);
         renderStory(state.story);
+        updateTypingIndicator(state.processing);
 
         if (state.finished) {
             document.getElementById("chat-panel").classList.add("finished");
@@ -54,14 +55,7 @@ async function pollState() {
             if (!state.story.illustration_loading) {
                 clearInterval(polling);
             }
-        }
-
-        // Check processing state for typing indicator
-        const procRes = await fetch(`/api/sessions/${sessionId}/processing`);
-        const procData = await procRes.json();
-        updateTypingIndicator(procData.processing);
-
-        if (!state.finished && !procData.processing) {
+        } else if (!state.processing) {
             setInputEnabled(true);
         }
     } catch (e) {

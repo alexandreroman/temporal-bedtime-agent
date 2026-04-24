@@ -57,8 +57,17 @@ class StorySessionWorkflow:
         # Illustration child workflow — started once the story is approved.
         self._illustration_workflow_id: str = ""
 
-    def _apply_result(self, response: StoryResponse) -> None:
-        """Extract story fields from the structured response and update state."""
+    async def _run_agent(
+        self, prompt: str, message_history: list[ModelMessage] | None = None
+    ) -> None:
+        """Invoke the agent and apply its response to workflow state."""
+        self._processing = True
+        try:
+            result = await temporal_agent.run(prompt, message_history=message_history)
+        finally:
+            self._processing = False
+
+        response = result.output
         self._messages.append(
             ChatMessage(role=Role.ASSISTANT, content=response.message)
         )
@@ -73,10 +82,7 @@ class StorySessionWorkflow:
     @workflow.run
     async def run(self) -> SessionState:
         # Initial greeting
-        self._processing = True
-        result = await temporal_agent.run("Hello!")
-        self._apply_result(result.output)
-        self._processing = False
+        await self._run_agent("Hello!")
 
         # Main loop: wait for user messages, process them
         while not self._finished:
@@ -89,52 +95,38 @@ class StorySessionWorkflow:
 
             user_msg = self._pending_user_message
             self._pending_user_message = None
+
+            # Rebuild pydantic-ai message history from prior turns so the LLM
+            # has full conversational context; the new user_msg is the prompt.
+            message_history: list[ModelMessage] = [
+                ModelRequest(parts=[UserPromptPart(content=msg.content)])
+                if msg.role == Role.USER
+                else ModelResponse(parts=[TextPart(content=msg.content)])
+                for msg in self._messages
+            ]
             self._messages.append(ChatMessage(role=Role.USER, content=user_msg))
-            self._processing = True
 
-            # Rebuild pydantic-ai message history from prior turns (excluding
-            # the latest user message, which is passed as the prompt below).
-            # This gives the LLM full conversational context.
-            message_history: list[ModelMessage] = []
-            for msg in self._messages[:-1]:
-                if msg.role == Role.USER:
-                    message_history.append(
-                        ModelRequest(parts=[UserPromptPart(content=msg.content)])
-                    )
-                else:
-                    message_history.append(
-                        ModelResponse(parts=[TextPart(content=msg.content)])
-                    )
-
-            result = await temporal_agent.run(
-                user_msg,
-                message_history=message_history,
-            )
-
-            self._apply_result(result.output)
-            self._processing = False
+            await self._run_agent(user_msg, message_history)
 
             # Start illustration as soon as the story is approved — all
             # elements are finalized and the prompt is definitive.
             if self._finished and self._story.illustration_prompt:
                 await self._start_illustration()
 
-        # Return the final state as the workflow result
         return self._build_state()
 
     async def _start_illustration(self) -> None:
         """Start the illustration child workflow."""
-        self._illustration_workflow_id = (
-            f"{workflow.info().workflow_id}-illustration"
-        )
+        info = workflow.info()
+        self._illustration_workflow_id = f"{info.workflow_id}-illustration"
         await workflow.start_child_workflow(
             GenerateIllustrationWorkflow.run,
             GenerateIllustrationInput(
                 prompt=self._story.illustration_prompt,
-                story_id=workflow.info().workflow_id,
+                story_id=info.workflow_id,
             ),
             id=self._illustration_workflow_id,
-            task_queue=workflow.info().task_queue,
+            task_queue=info.task_queue,
             parent_close_policy=ParentClosePolicy.ABANDON,
         )
 
@@ -144,8 +136,8 @@ class StorySessionWorkflow:
 
     def _build_state(self) -> SessionState:
         return SessionState(
-            messages=list(self._messages),
-            story=self._story.model_copy(),
+            messages=self._messages,
+            story=self._story,
             finished=self._finished,
             illustration_workflow_id=self._illustration_workflow_id,
         )

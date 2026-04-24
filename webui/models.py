@@ -18,3 +18,4 @@ class SessionState(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     story: Story = Field(default_factory=Story)
     finished: bool = False
+    processing: bool = False

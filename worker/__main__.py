@@ -1,3 +1,3 @@
-from worker import _run_worker
+from worker import _entrypoint
 
-_run_worker()
+_entrypoint()

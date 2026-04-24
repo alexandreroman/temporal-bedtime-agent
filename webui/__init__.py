@@ -12,9 +12,8 @@ from temporalio.service import RPCError, RPCStatusCode
 
 from webui.config import TASK_QUEUE, TEMPORAL_ADDRESS
 from webui.models import SessionState, Story
-# The worker and webui have separate SessionState models: the worker's model
-# is what Temporal stores (no illustration URL), while the webui's model adds
-# presentation fields (illustration_url, illustration_loading, session_id).
+# The worker persists its own SessionState in workflow history; the webui
+# wraps it with presentation fields (session_id, processing, illustration_*).
 from worker.models import SessionState as WorkerSessionState
 
 structlog.configure(
@@ -25,8 +24,6 @@ structlog.configure(
         structlog.processors.JSONRenderer(),
     ],
 )
-
-STATIC_DIR = "static"
 
 app = FastAPI(title="Temporal Bedtime Agent")
 logger = structlog.get_logger("webui")
@@ -44,38 +41,23 @@ async def get_client() -> Client:
     return _client
 
 
-# ---------------------------------------------------------------------------
-# Illustration — poll the child workflow started by StorySessionWorkflow
-# ---------------------------------------------------------------------------
-
-async def _poll_illustration(
-    client: Client, workflow_id: str
-) -> tuple[str, bool, bool]:
-    """Poll an illustration workflow.
-
-    Returns (url, still_running, failed). The illustration workflow is started
-    by the story workflow as a child, so this function only checks status —
-    it never starts a workflow.
-    """
+async def _fill_illustration(client: Client, workflow_id: str, story: Story) -> None:
+    """Populate the story's illustration fields from the child workflow status."""
     handle = client.get_workflow_handle(workflow_id)
-
     try:
         desc = await handle.describe()
     except RPCError as e:
         if e.status == RPCStatusCode.NOT_FOUND:
-            return "", False, False
+            return
         raise
 
     if desc.status == WorkflowExecutionStatus.COMPLETED:
-        return await handle.result(), False, False
-    if desc.status == WorkflowExecutionStatus.RUNNING:
-        return "", True, False
-    return "", False, True
+        story.illustration_url = await handle.result()
+    elif desc.status == WorkflowExecutionStatus.RUNNING:
+        story.illustration_loading = True
+    else:
+        story.illustration_failed = True
 
-
-# ---------------------------------------------------------------------------
-# Request / response models
-# ---------------------------------------------------------------------------
 
 class CreateSessionResponse(BaseModel):
     session_id: str
@@ -84,10 +66,6 @@ class CreateSessionResponse(BaseModel):
 class SendMessageRequest(BaseModel):
     message: str
 
-
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
 
 @app.post("/api/sessions", response_model=CreateSessionResponse)
 async def create_session() -> CreateSessionResponse:
@@ -112,61 +90,34 @@ async def get_session_state(session_id: str) -> SessionState:
         desc = await handle.describe()
         if desc.status == WorkflowExecutionStatus.COMPLETED:
             # Workflow finished — get the result directly, no query needed
-            worker_state = WorkerSessionState.model_validate(
-                await handle.result()
-            )
+            worker_state = WorkerSessionState.model_validate(await handle.result())
+            processing = False
         else:
             # Workflow still running — query for current state
             worker_state = await handle.query(
                 "get_state", result_type=WorkerSessionState
             )
+            processing = await handle.query("is_processing", result_type=bool)
     except Exception as e:
         logger.error("Failed to get session state", session_id=session_id, error=str(e))
         raise HTTPException(status_code=404, detail=str(e))
 
     # The story workflow starts the illustration as a child workflow
-    # once the story is approved.  The webui only polls its status.
-    illustration_wf_id = worker_state.illustration_workflow_id
-    illustration_url = ""
-    illustration_loading = False
-    illustration_failed = False
-    if illustration_wf_id:
+    # once the story is approved. The webui only polls its status.
+    story = Story(title=worker_state.story.title, text=worker_state.story.text)
+    if worker_state.illustration_workflow_id:
         try:
-            (
-                illustration_url,
-                illustration_loading,
-                illustration_failed,
-            ) = await _poll_illustration(client, illustration_wf_id)
+            await _fill_illustration(client, worker_state.illustration_workflow_id, story)
         except Exception as e:
             logger.error("Illustration poll failed", session_id=session_id, error=str(e))
 
     return SessionState(
         session_id=session_id,
         messages=worker_state.messages,
-        story=Story(
-            title=worker_state.story.title,
-            illustration_url=illustration_url,
-            illustration_loading=illustration_loading,
-            illustration_failed=illustration_failed,
-            text=worker_state.story.text,
-        ),
+        story=story,
         finished=worker_state.finished,
+        processing=processing,
     )
-
-
-@app.get("/api/sessions/{session_id}/processing")
-async def get_processing(session_id: str) -> dict[str, bool]:
-    client = await get_client()
-    try:
-        handle = client.get_workflow_handle(session_id)
-        desc = await handle.describe()
-        if desc.status == WorkflowExecutionStatus.COMPLETED:
-            return {"processing": False}
-        processing = await handle.query("is_processing", result_type=bool)
-        return {"processing": processing}
-    except Exception:
-        # Workflow completed or not found — not processing
-        return {"processing": False}
 
 
 @app.post("/api/sessions/{session_id}/messages")
@@ -184,22 +135,28 @@ async def send_message(session_id: str, req: SendMessageRequest) -> dict[str, st
 
 @app.get("/")
 async def index() -> FileResponse:
-    return FileResponse(f"{STATIC_DIR}/index.html")
+    return FileResponse("static/index.html")
 
 
 # Catch-all for deep-linked story URLs — the SPA handles routing client-side.
 @app.get("/stories/{story_id}")
 async def session_page(story_id: str) -> FileResponse:
-    return FileResponse(f"{STATIC_DIR}/index.html")
+    return FileResponse("static/index.html")
 
 
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-def run() -> None:
+def run(reload: bool = True) -> None:
     import uvicorn
 
     from webui.config import WEBUI_HOST, WEBUI_PORT
 
     logger.info("Starting webui", host=WEBUI_HOST, port=WEBUI_PORT)
-    uvicorn.run("webui:app", host=WEBUI_HOST, port=WEBUI_PORT, reload=True, log_level="warning")
+    uvicorn.run(
+        "webui:app",
+        host=WEBUI_HOST,
+        port=WEBUI_PORT,
+        reload=reload,
+        log_level="warning",
+    )
