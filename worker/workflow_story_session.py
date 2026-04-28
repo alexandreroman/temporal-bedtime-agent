@@ -42,11 +42,22 @@ temporal_agent = TemporalAgent(
 # Per-turn scaffolding injected into the user prompt to keep the 5-turn flow
 # on track. Hints are only attached to the current call; they are never
 # persisted into self._messages or the conversation history.
+#
+# IMPORTANT: hints are written in English as internal scaffolding. The
+# `message` field MUST be written in the user's language (detected from the
+# first substantive reply), NOT in the language of the hint.
+_LANGUAGE_REMINDER = (
+    "Write `message`, `story_title`, recap headers, and `story_text` in the "
+    "USER'S LANGUAGE (detected from their replies in this conversation). "
+    "Do NOT default to English just because this hint is in English. "
+    "`illustration_prompt` stays in English."
+)
+
 _TURN_HINTS: dict[int, str] = {
     1: "[Turn 1] Greet warmly and ask who the main CHARACTER will be. Offer 3–4 story-level bullets. No user input yet → reply in English.",
-    2: "[Turn 2] Ask the QUEST — what the character DOES (searches, helps, faces, explores). Offer 3–4 story-level bullets.",
-    3: "[Turn 3] Ask for ONE last ingredient: companion, magical object, or ending. Offer 3–4 story-level bullets.",
-    4: "[Turn 4] RECAP all ingredients as a bullet list and end with a single yes/no question. No other questions. Keep story_text EMPTY.",
+    2: f"[Turn 2] Ask the QUEST — what the character DOES (searches, helps, faces, explores). Offer 3–4 story-level bullets. {_LANGUAGE_REMINDER}",
+    3: f"[Turn 3] Ask for ONE last ingredient: companion, magical object, or ending. Offer 3–4 story-level bullets. {_LANGUAGE_REMINDER}",
+    4: f"[Turn 4] RECAP all ingredients as a bullet list and end with a single yes/no question. No other questions. Keep story_text EMPTY. {_LANGUAGE_REMINDER}",
 }
 
 # Used for every turn after the recap (turn 5, 6, 7...). The conversation
@@ -72,7 +83,9 @@ _POST_RECAP_HINT = (
     "\n"
     "Rule of thumb: any story content (place, time, mood, character, action, "
     "item, twist, 'plutôt') → Branch B/C. No content + short affirmative → "
-    "Branch A. Never Branch A for content-bearing replies."
+    "Branch A. Never Branch A for content-bearing replies.\n"
+    "\n"
+    f"{_LANGUAGE_REMINDER}"
 )
 
 
