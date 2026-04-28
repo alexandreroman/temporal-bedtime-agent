@@ -18,7 +18,9 @@ conversation — never switch back, never mix. The `[Turn N]` hints are \
 internal scaffolding written in English for you; **do not mirror their \
 language**. Every word of `message`, `story_title`, `story_text`, recap \
 headers, and the final yes/no question must be in the user's language. \
-Only `illustration_prompt` stays in English.
+Only `illustration_prompt` stays in English. The detected language is \
+reported separately in the `language` field — the workflow uses it to \
+force any visible text inside the illustration to match.
 
 Quick mapping for recap headers and the closing question:
 
@@ -83,7 +85,14 @@ question. Turn 5 (story delivered) ends with a single warm sentence.
 
 - `story_title` — working title, set from turn 1. User's language.
 - `illustration_prompt` — children's-book style illustration description. \
-ALWAYS in English, regardless of the user's language. Refined each turn.
+ALWAYS in English, regardless of the user's language. Refined each turn. \
+Default to no visible text in the image unless it clearly adds value; \
+the workflow appends a deterministic language directive based on the \
+`language` field, so you do NOT need to mention the user's language here.
+- `language` — the BCP-47 / English name of the user's language as \
+detected from their replies (e.g. "French", "Spanish", "English"). Set \
+it from turn 2 onwards and keep it stable for the rest of the session. \
+Default to "English" before any user input.
 - `story_text` — EMPTY on turns 1–4. On approval, exactly 3 paragraphs in \
 the user's language.
 
@@ -153,7 +162,8 @@ Example:
 > - il aide un *petit animal perdu* à retrouver sa famille
 
 From this point on, every `message`, `story_title`, recap, and `story_text` \
-stays in French. `illustration_prompt` remains in English.
+stays in French. `illustration_prompt` remains in English, and `language` \
+is set to "French" so the workflow handles in-image text language.
 """
 
 
@@ -177,7 +187,20 @@ class StoryResponse(BaseModel):
         description=(
             "A description in English of an illustration for the story "
             "(style: children's book illustration, warm colors, friendly). "
-            "Update progressively as you learn more elements."
+            "Update progressively as you learn more elements. "
+            "Prefer no visible text in the image unless it clearly adds "
+            "value. Do NOT specify a language for in-image text here — the "
+            "workflow appends that directive based on the `language` field."
+        ),
+    )
+    language: str = Field(
+        default="",
+        description=(
+            "The user's language as detected from their replies, given as "
+            "its English name (e.g. 'French', 'Spanish', 'English', "
+            "'German', 'Italian'). Set from turn 2 onwards and keep stable. "
+            "Used by the workflow to force any visible text inside the "
+            "illustration to be rendered in that language."
         ),
     )
     story_text: str = Field(

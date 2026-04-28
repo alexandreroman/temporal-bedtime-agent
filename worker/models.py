@@ -19,6 +19,7 @@ class Story(BaseModel):
     title: str = ""
     illustration_prompt: str = ""
     text: str = ""
+    language: str = ""
 
 
 class SessionState(BaseModel):

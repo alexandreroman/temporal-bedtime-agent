@@ -50,7 +50,9 @@ _LANGUAGE_REMINDER = (
     "Write `message`, `story_title`, recap headers, and `story_text` in the "
     "USER'S LANGUAGE (detected from their replies in this conversation). "
     "Do NOT default to English just because this hint is in English. "
-    "`illustration_prompt` stays in English."
+    "`illustration_prompt` stays in English. Also fill `language` with the "
+    "English name of the user's language (e.g. 'French') — the workflow "
+    "uses it to force any in-image text to that language."
 )
 
 _TURN_HINTS: dict[int, str] = {
@@ -157,6 +159,8 @@ class StorySessionWorkflow:
             self._story.title = response.story_title
         if response.illustration_prompt:
             self._story.illustration_prompt = response.illustration_prompt
+        if response.language:
+            self._story.language = response.language
         if response.story_text:
             self._story.text = response.story_text
             self._finished = True
@@ -203,10 +207,17 @@ class StorySessionWorkflow:
         """Start the illustration child workflow."""
         info = workflow.info()
         self._illustration_workflow_id = f"{info.workflow_id}-illustration"
+        # Force any visible text inside the illustration to match the story's
+        # language — the agent never embeds this directive itself.
+        language = self._story.language or "English"
+        prompt = (
+            f"{self._story.illustration_prompt}\n\n"
+            f"Any visible text inside the image must be written in {language}."
+        )
         await workflow.start_child_workflow(
             GenerateIllustrationWorkflow.run,
             GenerateIllustrationInput(
-                prompt=self._story.illustration_prompt,
+                prompt=prompt,
                 story_id=info.workflow_id,
             ),
             id=self._illustration_workflow_id,
