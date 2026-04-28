@@ -101,10 +101,10 @@ This starts the Temporal server, the worker, and the web UI. Open [http://localh
 > PYDANTIC_AI_MODEL=openai:gpt-5.4-mini
 > ```
 >
-> Then recreate the workers:
+> Then recreate the worker:
 >
 > ```bash
-> docker-compose up --build -d worker-1 worker-2
+> docker-compose up --build -d worker
 > ```
 >
 > Docker Compose only reads `.env` at container creation time, so a simple `docker-compose restart` is **not** enough — you need to recreate the containers.
