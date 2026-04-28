@@ -216,7 +216,12 @@ class StorySessionWorkflow:
 
     @workflow.signal
     async def send_message(self, message: str) -> None:
-        self._pending_user_message = message
+        # Concatenate concurrent messages so none is dropped if the user
+        # sends multiple before the previous one is processed.
+        if self._pending_user_message is None:
+            self._pending_user_message = message
+        else:
+            self._pending_user_message += "\n" + message
 
     def _build_state(self) -> SessionState:
         return SessionState(
