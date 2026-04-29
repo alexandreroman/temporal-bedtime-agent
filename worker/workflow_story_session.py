@@ -44,43 +44,52 @@ temporal_agent = TemporalAgent(
 # persisted into self._messages or the conversation history.
 #
 # IMPORTANT: hints are written in English as internal scaffolding. The
-# `message` field MUST be written in the user's language (detected from the
-# first substantive reply), NOT in the language of the hint.
+# `message` field MUST be written in the user's language (matching their
+# MOST RECENT substantive reply), NOT in the language of the hint. If the
+# user switches language mid-conversation, follow them.
 _LANGUAGE_REMINDER = (
-    "Write `message`, `story_title`, recap headers, and `story_text` in the "
-    "SAME LANGUAGE the user actually wrote in — English if they wrote in "
-    "English, French if French, Spanish if Spanish, etc. Match what they "
-    "used; do not switch to a different language. This hint itself is "
-    "always in English and is NOT a signal about the user's language. "
-    "`illustration_prompt` stays in English regardless. Also fill "
-    "`language` with the English name of that language (e.g. 'English', "
-    "'French', 'Spanish') — the workflow uses it to force any in-image "
-    "text to that language."
+    "[STEP 1 — LANGUAGE LOCK, run this BEFORE writing anything else] "
+    "Look ONLY at the user message that follows below this hint. What "
+    "language did THAT message use? (Ignore the language of your own "
+    "previous replies, ignore the language of earlier user messages, "
+    "ignore the language of this hint.) Set `language` to the English "
+    "name of that language (e.g. 'French', 'Spanish', 'English', "
+    "'German', 'Italian'). Write `message`, `story_title`, recap "
+    "headers, and `story_text` ENTIRELY in that language — translate "
+    "any options, headers, and questions you would otherwise have "
+    "written in another language. Keep proper nouns the user gave you "
+    "as-is. If the language differs from your previous reply (the user "
+    "switched), switch WITH them on this turn, no exceptions — this "
+    "applies at the recap (turn 4), at story delivery (turn 5+), and at "
+    "every other turn. Never mix languages within a single message. "
+    "`illustration_prompt` stays in English regardless."
 )
 
 _TURN_HINTS: dict[int, str] = {
     1: "[Turn 1] Greet warmly and ask who the main CHARACTER will be. Offer 3–4 story-level bullets. No user input yet → reply in English.",
-    2: f"[Turn 2] Ask the QUEST — what the character DOES (searches, helps, faces, explores). Offer 3–4 story-level bullets. {_LANGUAGE_REMINDER}",
-    3: f"[Turn 3] Ask for ONE last ingredient: companion, magical object, or ending. Offer 3–4 story-level bullets. {_LANGUAGE_REMINDER}",
-    4: f"[Turn 4] RECAP all ingredients as a bullet list and end with a single yes/no question. No other questions. Keep story_text EMPTY. {_LANGUAGE_REMINDER}",
+    2: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 2] Ask the QUEST — what the character DOES (searches, helps, faces, explores). Offer 3–4 story-level bullets.",
+    3: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 3] Ask for ONE last ingredient: companion, magical object, or ending. Offer 3–4 story-level bullets.",
+    4: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 4] RECAP all ingredients as a bullet list and end with a single yes/no question. The recap headers and yes/no question MUST be in the language you locked at STEP 1, even if your previous reply was in a different language. No other questions. Keep story_text EMPTY.",
 }
 
 # Used for every turn after the recap (turn 5, 6, 7...). The conversation
 # stays open until the user actually approves.
 _POST_RECAP_HINT = (
+    f"{_LANGUAGE_REMINDER}\n"
+    "\n"
     "[Turn 5+] The recap has been shown; the user just replied. Pick ONE branch.\n"
     "\n"
-    "STEP 1 — AFFIRMATIVE GATE (run this FIRST, before anything else).\n"
+    "STEP 2 — AFFIRMATIVE GATE (after locking the language above).\n"
     "Read ONLY the latest user reply (ignore the prior conversation pattern). "
     "If the entire reply is a short affirmative with no other words — exactly "
     "one of: 'ok', 'OK', 'oui', 'yes', 'd'accord', 'parfait', 'vas-y', "
     "'allons-y', 'go', 'sí', 'ja', '👍', or a combination of these only "
     "('ok vas-y', 'oui parfait', 'ok parfait') — IMMEDIATELY pick Branch A. "
-    "Do not run Step 2. Do not invent content. Adding a sentence like "
+    "Do not run Step 3. Do not invent content. Adding a sentence like "
     "'j'ajoute X' when X was not in the user's reply is a CRITICAL "
     "HALLUCINATION BUG — the user will be stuck in a loop.\n"
     "\n"
-    "STEP 2 — CONTENT SCAN (only if Step 1 did NOT match).\n"
+    "STEP 3 — CONTENT SCAN (only if Step 2 did NOT match).\n"
     "Scan the user's reply for ANY story content: a name, place, time of day, "
     "weather, mood, character, action, item, twist, scene, ending, OR the "
     "words 'plutôt', 'rather', 'instead', 'actually', 'ajoute', 'add', "
@@ -88,7 +97,7 @@ _POST_RECAP_HINT = (
     "short affirmative WITH new content (e.g. 'ok mais ajoute X') is "
     "Branch C, not A.\n"
     "\n"
-    "BRANCH A — APPROVAL (generate now). Triggered by Step 1. "
+    "BRANCH A — APPROVAL (generate now). Triggered by Step 2. "
     "Action: fill `story_text` with a COMPLETE 3-paragraph story in the user's "
     "language RIGHT NOW; `message` = ONE warm sentence (no question, no story "
     "content, no recap, no bullet list). Saying 'I'll write it' without "
@@ -105,7 +114,7 @@ _POST_RECAP_HINT = (
     "REQUIRED OUTPUT below. Keep `story_text` EMPTY.\n"
     "\n"
     "REQUIRED OUTPUT for Branches B and C — `message` MUST contain ALL THREE "
-    "parts, in this order, in the user's language:\n"
+    "parts, in this order, in the language locked at the top of this hint:\n"
     "  1. ONE short acknowledgement sentence ('Parfait, on remplace…' / "
     "'Très bien, j'ajoute…').\n"
     "  2. A FRESH FULL RECAP as a Markdown bullet list of the 3 ingredients "
@@ -113,9 +122,7 @@ _POST_RECAP_HINT = (
     "/ Compagnon · Fin, ES: Héroe / Misión / Compañero · Final, etc.).\n"
     "  3. The yes/no question (FR: 'Dois-je écrire l'histoire maintenant ?').\n"
     "Skipping the recap or the question is a bug — the user must always be "
-    "able to confirm.\n"
-    "\n"
-    f"{_LANGUAGE_REMINDER}"
+    "able to confirm."
 )
 
 

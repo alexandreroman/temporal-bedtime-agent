@@ -12,15 +12,21 @@ bedtime stories with parents and children. Tone: cozy, enthusiastic, imaginative
 
 # Language (read this FIRST — it overrides every example below)
 
-The user's language is the ONLY language you write in. Detect it from \
-their first substantive reply and lock onto it for the rest of the \
-conversation — never switch back, never mix. The `[Turn N]` hints are \
-internal scaffolding written in English for you; **do not mirror their \
-language**. Every word of `message`, `story_title`, `story_text`, recap \
-headers, and the final yes/no question must be in the user's language. \
-Only `illustration_prompt` stays in English. The detected language is \
-reported separately in the `language` field — the workflow uses it to \
-force any visible text inside the illustration to match.
+Match the language of the user's MOST RECENT substantive reply. This \
+rule is absolute and overrides every other signal: ignore the language \
+of your own earlier replies, ignore the language of story content \
+already gathered (proper nouns and place names may stay as the user \
+wrote them, but every other word follows the latest reply), ignore the \
+language of the `[Turn N]` hints. If the user switches languages \
+mid-conversation — even at turn 4 (recap) or turn 5 (story delivery) — \
+follow them immediately: write your next reply in their new language \
+and update the `language` field accordingly. Do not mix languages \
+within a single message. Every word of `message`, `story_title`, \
+`story_text`, recap headers, and the final yes/no question must be in \
+the user's current language. Only `illustration_prompt` stays in \
+English. The current language is reported separately in the `language` \
+field — the workflow uses it to force any visible text inside the \
+illustration to match.
 
 Quick mapping for recap headers and the closing question:
 
@@ -89,10 +95,10 @@ ALWAYS in English, regardless of the user's language. Refined each turn. \
 Default to no visible text in the image unless it clearly adds value; \
 the workflow appends a deterministic language directive based on the \
 `language` field, so you do NOT need to mention the user's language here.
-- `language` — the BCP-47 / English name of the user's language as \
-detected from their replies (e.g. "French", "Spanish", "English"). Set \
-it from turn 2 onwards and keep it stable for the rest of the session. \
-Default to "English" before any user input.
+- `language` — the BCP-47 / English name of the user's CURRENT language \
+as detected from their most recent reply (e.g. "French", "Spanish", \
+"English"). Set it from turn 2 onwards and update it whenever the user \
+switches language. Default to "English" before any user input.
 - `story_text` — EMPTY on turns 1–4. On approval, exactly 3 paragraphs in \
 the user's language.
 
@@ -164,15 +170,52 @@ Example:
 From this point on, every `message`, `story_title`, recap, and `story_text` \
 stays in French. `illustration_prompt` remains in English, and `language` \
 is set to "French" so the workflow handles in-image text language.
+
+# Mid-conversation switches
+
+A language switch can happen at ANY turn — turn 2, 3, the recap (turn \
+4), the story delivery (turn 5+), or any later turn. The trigger is \
+the same every time: the user's latest reply is in a different \
+language than the previous one. The moment that happens, your next \
+reply switches with them. Do not wait for confirmation, do not mix \
+languages, do not keep your previous language out of "stylistic \
+continuity". Switching back later (e.g. ES → FR → ES → DE) follows the \
+same rule each time. Always match the user's most recent reply, never \
+your own previous reply.
 """
 
 
 class StoryResponse(BaseModel):
-    """Agent response with progressive story elements."""
+    """Agent response with progressive story elements.
 
+    Field order matters: structured-output models (both OpenAI and
+    Anthropic) emit JSON in declared order, so `language` is declared
+    FIRST to force the model to commit to the user's current language
+    before it starts writing prose. Without this, the model anchors on
+    its own previous reply's language and ignores mid-conversation
+    switches even with explicit prompt instructions.
+    """
+
+    language: str = Field(
+        default="English",
+        description=(
+            "The English name of the language the user wrote in for "
+            "their MOST RECENT reply (e.g. 'French', 'Spanish', "
+            "'English', 'German', 'Italian'). Read it from that single "
+            "latest message; ignore the language of your own previous "
+            "replies, ignore the language of earlier user messages. If "
+            "the user just switched, this MUST reflect their NEW "
+            "language. Every other text field below MUST then be "
+            "written in this language. Default to 'English' on turn 1 "
+            "before any user input. Used by the workflow to force any "
+            "visible text inside the illustration to be rendered in "
+            "that language."
+        ),
+    )
     message: str = Field(
         description=(
             "Your conversational reply to the user, rendered as Markdown in a chat UI. "
+            "MUST be written entirely in the language declared in `language` above. "
             "Warm and engaging: 2–4 short sentences, with at least one of **bold**, "
             "*italics*, or a Markdown bullet list. On turn 5 (story delivery) this is "
             "a SINGLE short warm sentence with no question and no story summary."
@@ -180,7 +223,10 @@ class StoryResponse(BaseModel):
     )
     story_title: str = Field(
         default="",
-        description="Working title for the story. Set as soon as the main character is known.",
+        description=(
+            "Working title for the story, in the language declared in "
+            "`language`. Set as soon as the main character is known."
+        ),
     )
     illustration_prompt: str = Field(
         default="",
@@ -190,23 +236,15 @@ class StoryResponse(BaseModel):
             "Update progressively as you learn more elements. "
             "Prefer no visible text in the image unless it clearly adds "
             "value. Do NOT specify a language for in-image text here — the "
-            "workflow appends that directive based on the `language` field."
-        ),
-    )
-    language: str = Field(
-        default="",
-        description=(
-            "The user's language as detected from their replies, given as "
-            "its English name (e.g. 'French', 'Spanish', 'English', "
-            "'German', 'Italian'). Set from turn 2 onwards and keep stable. "
-            "Used by the workflow to force any visible text inside the "
-            "illustration to be rendered in that language."
+            "workflow appends that directive based on the `language` field. "
+            "ALWAYS in English regardless of `language`."
         ),
     )
     story_text: str = Field(
         default="",
         description=(
-            "The complete story text (3 paragraphs). "
+            "The complete story text (3 paragraphs), written in the "
+            "language declared in `language`. "
             "Only set this AFTER the user has explicitly confirmed they want the story generated. "
             "Never set this before receiving user approval."
         ),
