@@ -48,11 +48,14 @@ temporal_agent = TemporalAgent(
 # first substantive reply), NOT in the language of the hint.
 _LANGUAGE_REMINDER = (
     "Write `message`, `story_title`, recap headers, and `story_text` in the "
-    "USER'S LANGUAGE (detected from their replies in this conversation). "
-    "Do NOT default to English just because this hint is in English. "
-    "`illustration_prompt` stays in English. Also fill `language` with the "
-    "English name of the user's language (e.g. 'French') — the workflow "
-    "uses it to force any in-image text to that language."
+    "SAME LANGUAGE the user actually wrote in — English if they wrote in "
+    "English, French if French, Spanish if Spanish, etc. Match what they "
+    "used; do not switch to a different language. This hint itself is "
+    "always in English and is NOT a signal about the user's language. "
+    "`illustration_prompt` stays in English regardless. Also fill "
+    "`language` with the English name of that language (e.g. 'English', "
+    "'French', 'Spanish') — the workflow uses it to force any in-image "
+    "text to that language."
 )
 
 _TURN_HINTS: dict[int, str] = {
