@@ -203,11 +203,17 @@ class StoryResponse(BaseModel):
     """Agent response with progressive story elements.
 
     Field order matters: structured-output models (both OpenAI and
-    Anthropic) emit JSON in declared order, so `language` is declared
-    FIRST to force the model to commit to the user's current language
-    before it starts writing prose. Without this, the model anchors on
-    its own previous reply's language and ignores mid-conversation
-    switches even with explicit prompt instructions.
+    Anthropic) emit JSON in declared order, which lets us force the
+    model to commit to two key decisions before it writes any prose.
+    `language` is declared FIRST to lock the user's current language;
+    without this, the model anchors on its own previous reply's
+    language and ignores mid-conversation switches. `story_text` is
+    declared SECOND so that on the post-recap turn the model has to
+    decide RIGHT NOW whether the user has approved (Branch A: fill
+    the 3-paragraph story) or not (Branches B/C, gathering: leave
+    empty); without this, the model writes a "story is ready"
+    acknowledgement in `message` and then drops `story_text` to its
+    "" default — a "dry run" with no actual story.
     """
 
     language: str = Field(
@@ -231,13 +237,36 @@ class StoryResponse(BaseModel):
             "inside the illustration to be rendered in that language."
         ),
     )
+    story_text: str = Field(
+        default="",
+        description=(
+            "The full bedtime story when the user has approved generation: "
+            "exactly three paragraphs, written entirely in the language "
+            "declared in `language`. On the post-recap turn (turn 5+), "
+            "fill this WHENEVER the latest user reply is a short "
+            "affirmative — any of 'ok', 'OK', 'oui', 'yes', 'sí', 'sì', "
+            "'ja', \"d'accord\", 'parfait', 'vas-y', 'allons-y', 'go', "
+            "'👍', or a combination of these only ('ok vas-y', 'oui "
+            "parfait'). Each item is full approval; there is no weaker "
+            "form of yes — 'sí' and 'ja' are explicit confirmations, not "
+            "mere acknowledgements. Also fill it whenever the user "
+            "otherwise asks for the story to be written. Leave EMPTY "
+            "(\"\") on turns 1–4 (gathering phase) and on post-recap "
+            "turns where the user adds a new ingredient or asks to swap "
+            "one (Branches B/C) — those turns require a fresh recap in "
+            "`message`, not a story. Producing an empty `story_text` "
+            "while `message` says 'I'll write it' is a CRITICAL bug "
+            "that strands the user in a loop."
+        ),
+    )
     message: str = Field(
         description=(
             "Your conversational reply to the user, rendered as Markdown in a chat UI. "
             "MUST be written entirely in the language declared in `language` above. "
             "Warm and engaging: 2–4 short sentences, with at least one of **bold**, "
-            "*italics*, or a Markdown bullet list. On turn 5 (story delivery) this is "
-            "a SINGLE short warm sentence with no question and no story summary."
+            "*italics*, or a Markdown bullet list. On turn 5 (story delivery — "
+            "i.e. when `story_text` has just been filled above) this is a SINGLE "
+            "short warm sentence with no question and no story summary."
         ),
     )
     story_title: str = Field(
@@ -257,15 +286,6 @@ class StoryResponse(BaseModel):
             "value. Do NOT specify a language for in-image text here — the "
             "workflow appends that directive based on the `language` field. "
             "ALWAYS in English regardless of `language`."
-        ),
-    )
-    story_text: str = Field(
-        default="",
-        description=(
-            "The complete story text (3 paragraphs), written in the "
-            "language declared in `language`. "
-            "Only set this AFTER the user has explicitly confirmed they want the story generated. "
-            "Never set this before receiving user approval."
         ),
     )
 
