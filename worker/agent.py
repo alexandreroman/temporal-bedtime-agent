@@ -28,6 +28,20 @@ English. The current language is reported separately in the `language` \
 field — the workflow uses it to force any visible text inside the \
 illustration to match.
 
+**Substantive vs. ambiguous replies.** A "substantive" reply is one \
+with enough lexical content to identify a language — a phrase, a \
+sentence, or a proper noun introduced with a function word ("Max **le** \
+chien", "Max **the** dog"). Short language-agnostic affirmatives or \
+reactions — `ok`, `OK`, `oui`, `yes`, `sí`, `ja`, `vas-y`, `go`, \
+`d'accord`, `parfait`, `allons-y`, `👍`, `🙂`, `❤️`, an isolated proper \
+noun like `Max`, or any combination of these — are NOT substantive: \
+they tell you nothing reliable about the user's language. When the \
+latest user reply is non-substantive, KEEP the language from the most \
+recent **prior** substantive user message; do NOT fall back to English \
+and do NOT fall back to your own previous reply's language. The \
+language only changes when the user writes a new substantive reply in \
+a different language.
+
 Quick mapping for recap headers and the closing question:
 
 - **FR** — Héros / Quête / Compagnon / Fin · "Dois-je écrire l'histoire maintenant ?"
@@ -200,16 +214,21 @@ class StoryResponse(BaseModel):
         default="English",
         description=(
             "The English name of the language the user wrote in for "
-            "their MOST RECENT reply (e.g. 'French', 'Spanish', "
-            "'English', 'German', 'Italian'). Read it from that single "
-            "latest message; ignore the language of your own previous "
-            "replies, ignore the language of earlier user messages. If "
-            "the user just switched, this MUST reflect their NEW "
-            "language. Every other text field below MUST then be "
-            "written in this language. Default to 'English' on turn 1 "
-            "before any user input. Used by the workflow to force any "
-            "visible text inside the illustration to be rendered in "
-            "that language."
+            "their MOST RECENT SUBSTANTIVE reply (e.g. 'French', "
+            "'Spanish', 'English', 'German', 'Italian'). 'Substantive' "
+            "means the reply has enough lexical content to identify a "
+            "language — a phrase or sentence. If the latest user reply "
+            "is a bare affirmative ('ok', 'oui', 'yes', '👍'), an emoji, "
+            "or an isolated proper noun, that reply is NOT substantive: "
+            "carry the language forward from the previous substantive "
+            "user message instead of resetting to 'English' or to your "
+            "own previous reply's language. Ignore the language of "
+            "your own previous replies. If the user just switched in a "
+            "substantive reply, this MUST reflect their NEW language. "
+            "Every other text field below MUST be written in this "
+            "language. Default to 'English' on turn 1 before any user "
+            "input. Used by the workflow to force any visible text "
+            "inside the illustration to be rendered in that language."
         ),
     )
     message: str = Field(
