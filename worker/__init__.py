@@ -7,6 +7,10 @@ import structlog
 from pydantic_ai.durable_exec.temporal import PydanticAIPlugin
 from temporalio.client import Client
 from temporalio.worker import Worker
+from temporalio.worker.workflow_sandbox import (
+    SandboxedWorkflowRunner,
+    SandboxRestrictions,
+)
 
 from worker.activities import generate_illustration
 from worker.config import TASK_QUEUE, TEMPORAL_ADDRESS
@@ -32,12 +36,21 @@ async def main() -> None:
     # LLM calls into replayable activities for durable execution.
     client = await Client.connect(TEMPORAL_ADDRESS, plugins=[PydanticAIPlugin()])
 
+    # FIXME: pydantic-ai >=1.95 grabs the current OTEL traceparent at the end
+    # of each agent run, which triggers a lazy `opentelemetry` import inside
+    # the workflow sandbox and hits an `os.environ.get` restriction. Declare
+    # the whole `opentelemetry` namespace as pass-through so the sandbox uses
+    # the already-loaded host modules instead of re-executing them. Remove
+    # once pydantic-ai's TemporalAgent handles this internally.
+    restrictions = SandboxRestrictions.default.with_passthrough_modules("opentelemetry")
+
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
         workflows=[StorySessionWorkflow, GenerateIllustrationWorkflow],
         activities=[generate_illustration],
         identity=identity,
+        workflow_runner=SandboxedWorkflowRunner(restrictions=restrictions),
     )
 
     logger.info("Worker started", task_queue=TASK_QUEUE, identity=identity)
