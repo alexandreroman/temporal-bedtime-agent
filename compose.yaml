@@ -1,15 +1,27 @@
 services:
   temporal:
-    image: temporalio/temporal
+    image: temporalio/temporal:1.7.0
+    pull_policy: missing
+    command:
+      - server
+      - start-dev
+      - --ip
+      - 0.0.0.0
+      - --ui-port
+      - "8233"
     ports:
-      - "7233:7233"
-      - "8233:8233"
-    command: server start-dev --ip 0.0.0.0
+      - "7233:7233" # gRPC — workers & clients
+      - "8233:8233" # Web UI — http://localhost:8233
     healthcheck:
       test: ["CMD-SHELL", "temporal operator cluster health"]
       interval: 10s
       timeout: 10s
       retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
 
   worker:
     build:
@@ -17,8 +29,7 @@ services:
       dockerfile: Dockerfile.worker
     env_file: .env
     environment:
-      - TEMPORAL_ADDRESS=temporal:7233
-    restart: on-failure
+      TEMPORAL_ADDRESS: temporal:7233
     depends_on:
       temporal:
         condition: service_healthy
@@ -26,6 +37,10 @@ services:
       - illustrations:/app/static/illustrations
     deploy:
       replicas: 2
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
 
   webui:
     build:
@@ -33,15 +48,19 @@ services:
       dockerfile: Dockerfile.webui
     env_file: .env
     environment:
-      - TEMPORAL_ADDRESS=temporal:7233
+      TEMPORAL_ADDRESS: temporal:7233
     ports:
-      - "8000:8000"
-    restart: on-failure
+      - "8000:8000" # http — Web UI
     depends_on:
       temporal:
         condition: service_healthy
     volumes:
       - illustrations:/app/static/illustrations
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    restart: unless-stopped
 
 volumes:
   illustrations:
