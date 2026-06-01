@@ -18,6 +18,14 @@ dependencies = [
 worker = "worker:run"
 webui = "webui:run"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.hatch.build.targets.wheel]
 packages = [
     "worker",

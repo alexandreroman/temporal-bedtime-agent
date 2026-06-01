@@ -13,10 +13,17 @@ with workflow.unsafe.imports_passed_through():
     import annotated_types  # noqa: F401 — pre-load to avoid sandbox warning
 
     from pydantic_ai.durable_exec.temporal import TemporalAgent
-    from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
+    from pydantic_ai.messages import (
+        ModelMessage,
+        ModelRequest,
+        ModelResponse,
+        SystemPromptPart,
+        TextPart,
+        UserPromptPart,
+    )
 
     from worker.activities import GenerateIllustrationInput
-    from worker.agent import story_agent
+    from worker.agent import SYSTEM_PROMPT, story_agent
     from worker.models import (
         ChatMessage,
         Role,
@@ -137,6 +144,31 @@ _POST_RECAP_HINT = (
 )
 
 
+def _build_message_history(messages: list[ChatMessage]) -> list[ModelMessage]:
+    """Rebuild the pydantic-ai message history from the stored turns.
+
+    pydantic-ai only auto-injects the agent's ``system_prompt`` on the very
+    first run (the one where no ``message_history`` is supplied). On every
+    later turn we hand it a reconstructed history, and pydantic-ai then takes
+    that history verbatim — so unless we prepend the system prompt ourselves
+    it is silently dropped and the agent runs on the per-turn hint alone.
+    Losing the full language-lock and flow rules is exactly what let a
+    single-language conversation drift mid-stream (e.g. an all-English chat
+    wandering into Spanish, or French sliding back to English). Prepending it
+    here keeps the rules in front of the model on every turn. ``SYSTEM_PROMPT``
+    is a module constant, so this stays deterministic under workflow replay.
+    """
+    history: list[ModelMessage] = [
+        ModelRequest(parts=[SystemPromptPart(content=SYSTEM_PROMPT)])
+    ]
+    for msg in messages:
+        if msg.role == Role.USER:
+            history.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
+        else:
+            history.append(ModelResponse(parts=[TextPart(content=msg.content)]))
+    return history
+
+
 @workflow.defn
 class StorySessionWorkflow:
     # Declares which TemporalAgents this workflow uses, so their activities
@@ -206,13 +238,9 @@ class StorySessionWorkflow:
             self._pending_user_message = None
 
             # Rebuild pydantic-ai message history from prior turns so the LLM
-            # has full conversational context; the new user_msg is the prompt.
-            message_history: list[ModelMessage] = [
-                ModelRequest(parts=[UserPromptPart(content=msg.content)])
-                if msg.role == Role.USER
-                else ModelResponse(parts=[TextPart(content=msg.content)])
-                for msg in self._messages
-            ]
+            # has full conversational context (incl. the system prompt); the
+            # new user_msg is the prompt.
+            message_history = _build_message_history(self._messages)
             self._messages.append(ChatMessage(role=Role.USER, content=user_msg))
 
             await self._run_agent(user_msg, message_history)
