@@ -70,9 +70,16 @@ Offer 3–4 concrete story-level options.
 No new sub-questions. `story_text` stays EMPTY.
 - **Turn 5+** — read the user's reply:
   - Pure short affirmative (ok/yes/oui/vas-y/👍, no content) → **generate**: \
-fill `story_text` with a 3-paragraph story; `message` is ONE warm sentence.
-  - Change request ("plutôt un cristal", "rather…") → swap, re-recap, re-ask.
-  - Extra detail ("à la fin X", "il fait nuit") → absorb, re-recap, re-ask.
+set `writing_story`=true, fill `story_text` with a 3-paragraph story; \
+`message` is ONE warm sentence.
+  - Change request ("plutôt un cristal", "rather…") → swap, re-recap, re-ask; \
+`writing_story`=false.
+  - Extra detail ("à la fin X", "il fait nuit") → absorb, re-recap, re-ask; \
+`writing_story`=false.
+
+Decide `writing_story` FIRST, before writing anything. Never announce that \
+you are writing the story while `writing_story` is false or `story_text` is \
+empty — that strands the user.
 
 # Hard rules
 
@@ -207,13 +214,17 @@ class StoryResponse(BaseModel):
     model to commit to two key decisions before it writes any prose.
     `language` is declared FIRST to lock the user's current language;
     without this, the model anchors on its own previous reply's
-    language and ignores mid-conversation switches. `story_text` is
-    declared SECOND so that on the post-recap turn the model has to
-    decide RIGHT NOW whether the user has approved (Branch A: fill
-    the 3-paragraph story) or not (Branches B/C, gathering: leave
-    empty); without this, the model writes a "story is ready"
-    acknowledgement in `message` and then drops `story_text` to its
-    "" default — a "dry run" with no actual story.
+    language and ignores mid-conversation switches. `writing_story` is
+    declared SECOND, as an explicit boolean the model must commit to
+    BEFORE writing any prose: it forces a single approve/not-approve
+    decision up front, so `story_text` and `message` below stay
+    consistent with it. `story_text` is declared THIRD so that on the
+    post-recap turn the model has already decided whether the user
+    approved (writing_story=true: fill the 3-paragraph story) or not
+    (writing_story=false: leave empty); without this commit-first
+    ordering, the model writes a "story is ready" acknowledgement in
+    `message` and then drops `story_text` to its "" default — a "dry
+    run" with no actual story, which strands the user in a loop.
     """
 
     language: str = Field(
@@ -235,6 +246,24 @@ class StoryResponse(BaseModel):
             "language. Default to 'English' on turn 1 before any user "
             "input. Used by the workflow to force any visible text "
             "inside the illustration to be rendered in that language."
+        ),
+    )
+    writing_story: bool = Field(
+        default=False,
+        description=(
+            "Your up-front decision for THIS turn: are you writing the full "
+            "story now? Set True ONLY on the post-recap turn (turn 5+) when the "
+            "user's latest reply is a short affirmative approving the recap — "
+            "any of 'ok', 'OK', 'oui', 'yes', 'sí', 'sì', 'ja', \"d'accord\", "
+            "'parfait', 'vas-y', 'allons-y', 'go', '👍', or a combination of "
+            "these only. When True, `story_text` below MUST contain the "
+            "complete 3-paragraph story and `message` MUST be a SINGLE warm "
+            "sentence (no recap, no question). When False, `story_text` MUST be "
+            "empty (\"\"). False on the gathering turns (1–4) and on post-recap "
+            "turns where the user instead adds or swaps an ingredient. Setting "
+            "this True while leaving `story_text` empty, or announcing in "
+            "`message` that you will write the story while this is False, is a "
+            "CRITICAL bug that strands the user in a loop."
         ),
     )
     story_text: str = Field(

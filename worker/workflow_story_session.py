@@ -77,7 +77,7 @@ _TURN_HINTS: dict[int, str] = {
     1: "[Turn 1] Greet warmly and ask who the main CHARACTER will be. Offer 3–4 story-level bullets. No user input yet → reply in English.",
     2: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 2] Ask the QUEST — what the character DOES (searches, helps, faces, explores). Offer 3–4 story-level bullets.",
     3: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 3] Ask for ONE last ingredient: companion, magical object, or ending. Offer 3–4 story-level bullets.",
-    4: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 4] RECAP all ingredients as a bullet list and end with a single yes/no question. The recap headers and yes/no question MUST be in the language you locked at STEP 1, even if your previous reply was in a different language. No other questions. Keep story_text EMPTY.",
+    4: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 4] RECAP all ingredients as a bullet list and end with EXACTLY the write-confirmation question: 'Shall I write the story now?' (FR 'Dois-je écrire l'histoire maintenant ?', ES '¿Escribo la historia ahora?', DE 'Soll ich die Geschichte jetzt schreiben?', IT 'Scrivo la storia adesso?'). Do NOT ask 'Is this everything?', 'Is it correct?', 'Tout est-il correct ?', '¿Está todo bien?' or any variant — that phrasing makes the user's 'ok' ambiguous. The question MUST ask whether to WRITE the story now. The recap headers and the question MUST be in the language you locked at STEP 1, even if your previous reply was in a different language. No other questions. Set writing_story=false and keep story_text EMPTY.",
 }
 
 # Used for every turn after the recap (turn 5, 6, 7...). The conversation
@@ -106,20 +106,23 @@ _POST_RECAP_HINT = (
     "Branch C, not A.\n"
     "\n"
     "BRANCH A — APPROVAL (generate now). Triggered by Step 2. "
-    "Action: fill `story_text` with a COMPLETE 3-paragraph story in the user's "
-    "language RIGHT NOW; `message` = ONE warm sentence (no question, no story "
-    "content, no recap, no bullet list). Saying 'I'll write it' without "
-    "filling `story_text` is a bug. Re-showing the recap on Branch A is a bug.\n"
+    "Action: set `writing_story`=true and fill `story_text` with a COMPLETE "
+    "3-paragraph story in the user's language RIGHT NOW; `message` = ONE warm "
+    "sentence (no question, no story content, no recap, no bullet list). "
+    "`writing_story`=true with an empty `story_text`, or saying 'I'll write it' "
+    "without filling `story_text`, is a CRITICAL bug that strands the user. "
+    "Re-showing the recap on Branch A is a bug.\n"
     "\n"
     "BRANCH B — CHANGE REQUEST. The user wants to swap an element ('plutôt un "
     "cristal', 'rather…', 'instead'). Replace the old element with the new "
-    "one, then follow the REQUIRED OUTPUT below. Keep `story_text` EMPTY.\n"
+    "one, then follow the REQUIRED OUTPUT below. Set `writing_story`=false and "
+    "keep `story_text` EMPTY.\n"
     "\n"
     "BRANCH C — EXTRA DETAIL. The user adds a name, place, mood, twist, scene, "
     "or event ('à la fin il X', 'il fait nuit', 'Tim le chat l'accompagne', "
     "'au sommet ils trouvent…', 'ajoute…'). Absorb the detail INTO the "
     "existing ingredients — do NOT generate the story. Then follow the "
-    "REQUIRED OUTPUT below. Keep `story_text` EMPTY.\n"
+    "REQUIRED OUTPUT below. Set `writing_story`=false and keep `story_text` EMPTY.\n"
     "\n"
     "REQUIRED OUTPUT for Branches B and C — `message` MUST contain ALL THREE "
     "parts, in this order, in the language locked at the top of this hint:\n"
