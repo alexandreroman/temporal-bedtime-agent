@@ -100,7 +100,7 @@ async def get_session_state(session_id: str) -> SessionState:
             processing = await handle.query("is_processing", result_type=bool)
     except Exception as e:
         logger.error("Failed to get session state", session_id=session_id, error=str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
     # The story workflow starts the illustration as a child workflow
     # once the story is approved. The webui only polls its status.
@@ -130,7 +130,7 @@ async def send_message(session_id: str, req: SendMessageRequest) -> dict[str, st
         return {"status": "sent"}
     except Exception as e:
         logger.error("Failed to send message", session_id=session_id, error=str(e))
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=str(e)) from e
 
 
 @app.get("/")

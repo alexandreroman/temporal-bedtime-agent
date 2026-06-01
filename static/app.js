@@ -147,7 +147,6 @@ function renderStory(story) {
             textEl.classList.remove("story-hidden");
             textEl.classList.add("story-reveal");
         }
-
     }
 }
 
