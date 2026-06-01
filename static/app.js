@@ -155,7 +155,7 @@ function updateTypingIndicator(processing) {
     if (processing && !existing) {
         const div = document.createElement("div");
         div.className = "chat-msg typing";
-        div.innerHTML = 'Thinking<span class="dots"></span>';
+        div.innerHTML = 'Thinking<span class="dots"><span></span><span></span><span></span></span>';
         chatMessages.appendChild(div);
         chatMessages.scrollTop = chatMessages.scrollHeight;
     } else if (!processing && existing) {
