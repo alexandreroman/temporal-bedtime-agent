@@ -89,7 +89,7 @@ You have two options:
 ### 2. Run with Docker Compose
 
 ```bash
-docker-compose up --build
+docker compose up --build
 ```
 
 This starts the Temporal server, the worker, and the web UI. Open [http://localhost:8000](http://localhost:8000) to start creating a story, and [http://localhost:8233](http://localhost:8233) for the Temporal dashboard.
@@ -104,10 +104,10 @@ This starts the Temporal server, the worker, and the web UI. Open [http://localh
 > Then recreate the worker:
 >
 > ```bash
-> docker-compose up --build -d worker
+> docker compose up --build -d worker
 > ```
 >
-> Docker Compose only reads `.env` at container creation time, so a simple `docker-compose restart` is **not** enough — you need to recreate the containers.
+> Docker Compose only reads `.env` at container creation time, so a simple `docker compose restart` is **not** enough — you need to recreate the containers.
 
 ### 3. Run without Docker
 

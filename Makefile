@@ -11,15 +11,15 @@ endif
 
 .PHONY: infra-up
 infra-up: ## Bring up the Temporal dev server
-	docker-compose up -d temporal
+	docker compose up -d temporal
 
 .PHONY: infra-down
 infra-down: ## Stop the Temporal dev server (keeps container around)
-	docker-compose stop temporal
+	docker compose stop temporal
 
 .PHONY: infra-logs
 infra-logs: ## Follow logs from the Temporal dev server
-	docker-compose logs -f temporal
+	docker compose logs -f temporal
 
 ##@ App
 
@@ -43,15 +43,15 @@ dev: .venv infra-up ## Start Temporal, then run worker + webui on the host with 
 
 .PHONY: app-up
 app-up: ## Bring up the full stack in Docker (temporal + worker + webui)
-	docker-compose up -d --build
+	docker compose up -d --build
 
 .PHONY: app-down
 app-down: ## Tear down the full stack (removes containers and network)
-	docker-compose down
+	docker compose down
 
 .PHONY: app-logs
 app-logs: ## Follow logs from every stack container
-	docker-compose logs -f
+	docker compose logs -f
 
 ##@ Helpers
 

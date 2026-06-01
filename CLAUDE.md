@@ -6,7 +6,7 @@ See [README.md](README.md) for the project architecture and instructions to run 
 
 You MUST follow the instructions in [README.md](README.md) to build, run, and debug the application. This includes the Development section for local workflow and debugging guidance.
 
-Always use `docker-compose` (hyphenated) instead of `docker compose` (space-separated).
+Always use `docker compose` (space-separated) instead of `docker-compose` (hyphenated).
 
 The worker and webui logs are in JSON format (via structlog). Use `jq` or similar tools to filter and analyze log output.
 
