@@ -17,5 +17,9 @@ WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH"
 RUN useradd --create-home --uid 1000 app
 COPY --from=build --chown=app:app /app /app
+# Pre-create the illustrations directory owned by app. The "illustrations"
+# named volume is mounted here; Docker initializes a fresh volume's ownership
+# from this path, so the non-root app user can write generated images.
+RUN install -d -o app -g app /app/static /app/static/illustrations
 USER app
 CMD ["python", "-m", "worker"]
