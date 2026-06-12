@@ -7,8 +7,6 @@ services:
       - start-dev
       - --ip
       - 0.0.0.0
-      - --ui-port
-      - "8233"
     ports:
       - "7233:7233" # gRPC — workers & clients
       - "8233:8233" # Web UI — http://localhost:8233
