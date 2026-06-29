@@ -331,3 +331,33 @@ story_agent: Agent[None, StoryResponse] = Agent(
     output_type=StoryResponse,
     model_settings=ModelSettings(temperature=0.7),
 )
+
+
+def _demo() -> None:
+    """Run the PURE agent interactively, with no Temporal involved.
+
+    This is the same ``story_agent`` object the Temporal worker wraps in a
+    ``TemporalAgent`` (see ``worker/durable_agent.py``) — here it runs as a
+    plain, non-durable Pydantic AI agent. It demonstrates that the original
+    agent works standalone: no Temporal server, no worker, no sandbox.
+
+    Run it with ``python -m worker.agent``. Note this REPL does not replay the
+    per-turn flow scaffolding the workflow injects; it simply shows the agent
+    answering on its system prompt alone. Ctrl-C / Ctrl-D to exit.
+    """
+    print("Bedtime Story Agent — standalone (no Temporal). Ctrl-C to exit.\n")
+    history = None
+    user_input = "Hello!"
+    while True:
+        result = story_agent.run_sync(user_input, message_history=history)
+        print(f"\n{result.output.message}\n")
+        history = result.all_messages()
+        try:
+            user_input = input("you > ")
+        except (EOFError, KeyboardInterrupt):
+            print()
+            break
+
+
+if __name__ == "__main__":
+    _demo()
