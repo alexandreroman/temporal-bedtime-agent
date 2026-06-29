@@ -9,8 +9,12 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
 COPY worker/ worker/
+# --no-editable: install the project as a regular (non-editable) package. A
+# built image never needs an editable install, and it avoids uv writing an
+# editable wheel into the cache mount — a write that fails with EPERM under
+# rootless Podman's user-namespace uid mapping.
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --frozen --no-dev
+    uv sync --frozen --no-dev --no-editable
 
 FROM python:3.13-slim AS runtime
 WORKDIR /app
