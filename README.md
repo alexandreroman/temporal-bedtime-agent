@@ -31,6 +31,16 @@ graph LR
 - **Temporal Server** — Orchestrates the story creation workflow with durable execution. It guarantees that workflows survive failures and restarts, and coordinates communication between the web UI and the worker.
 - **Worker** — Executes the workflows and activities. It drives the conversational flow, calls the configured LLM to generate story text, and calls OpenAI to generate illustrations.
 
+### Pure agent vs. durable execution
+
+The conversational agent is a **pure [Pydantic AI](https://ai.pydantic.dev/) agent that knows nothing about Temporal**. Durability is layered on top without changing a single line of the agent:
+
+- **`agent/`** — the pure agent, with no Temporal dependency: the Pydantic AI `Agent` (`story_agent`), its structured-output schema (`StoryResponse`), the system prompt, and a `Conversation` object that drives the multi-turn flow (per-turn hints, history rebuilding). It runs standalone — see [Run the pure agent](#run-the-pure-agent-standalone).
+- **`worker/durable_agent.py`** — the durability layer: it wraps the pure agent in a Pydantic AI [`TemporalAgent`](https://ai.pydantic.dev/durable_execution/temporal/), turning each LLM call into a retryable Temporal activity. The original agent is untouched.
+- **`worker/workflow_story_session.py`** — the workflow that orchestrates the conversation, reusing the *same* `Conversation` object as the standalone agent.
+
+The dependency is strictly one-directional — `worker` depends on `agent`, never the reverse — which is what lets the very same agent run both as a plain CLI and as a durable workflow.
+
 ## Why Temporal?
 
 Temporal brings [durable execution](https://temporal.io/how-temporal-works) to this project: the workflow state is automatically persisted, so the story creation process is resilient to failures without any custom recovery logic.
@@ -136,6 +146,16 @@ Then open [http://localhost:8000](http://localhost:8000) in your browser and sta
 
 > You need the [Temporal CLI](https://docs.temporal.io/cli) to run `temporal server start-dev`.
 
+### Run the pure agent (standalone)
+
+The agent in `agent/` is a plain Pydantic AI agent with **no Temporal dependency**, so you can run it as a standalone command-line chat — no Temporal server, no worker, no web UI:
+
+```bash
+uv run python -m agent
+```
+
+This drives the exact same `Conversation` and `story_agent` the durable workflow uses; only the execution model differs (in-process here, durable activities under Temporal). It needs only an LLM API key (`OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` with an Anthropic model). Note that it is **not** durable: if the process stops, the conversation is lost — which is precisely the resilience Temporal adds in the full app.
+
 ## Development
 
 ### Dev Workflow
@@ -156,7 +176,7 @@ uv run worker
 uv run webui
 ```
 
-Each command runs in its own terminal. The worker watches `worker/` and `webui/` directories; any saved change restarts it automatically. The web UI reloads on changes to `webui/` and `static/`.
+Each command runs in its own terminal. The worker watches the `agent/`, `worker/`, and `webui/` directories; any saved change restarts it automatically. The web UI reloads on changes to `webui/` and `static/`.
 
 Open [http://localhost:8000](http://localhost:8000) for the app and [http://localhost:8233](http://localhost:8233) for the Temporal dashboard.
 
@@ -195,11 +215,22 @@ uv run webui 2>&1 | jq .
 ## Project Structure
 
 ```
-├── worker/          # Temporal worker: workflows, activities, AI agents
-├── webui/           # FastAPI REST API serving the frontend
-├── static/          # Single-page app (HTML, JS, CSS)
-├── pyproject.toml   # Project metadata and dependencies
-└── .env-sample      # Environment variable template
+├── agent/                # Pure Pydantic AI agent — NO Temporal dependency
+│   ├── __init__.py       #   StoryResponse schema + story_agent
+│   ├── prompt.py         #   System prompt
+│   ├── conversation.py   #   Conversation: multi-turn flow (turns, hints, history)
+│   ├── config.py         #   LLM model selection (PYDANTIC_AI_MODEL)
+│   └── __main__.py        #   Standalone CLI: `python -m agent`
+├── worker/               # Temporal worker (durability layer)
+│   ├── durable_agent.py  #   Wraps story_agent in a TemporalAgent
+│   ├── workflow_story_session.py   # Conversation workflow
+│   ├── workflow_illustration_generation.py
+│   ├── activities.py     #   Illustration generation (OpenAI Images)
+│   └── ...
+├── webui/                # FastAPI REST API serving the frontend
+├── static/               # Single-page app (HTML, JS, CSS)
+├── pyproject.toml        # Project metadata and dependencies
+└── .env-sample           # Environment variable template
 ```
 
 ## License
