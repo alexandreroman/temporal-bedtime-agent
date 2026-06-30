@@ -62,7 +62,7 @@ def _entrypoint() -> None:
 
 
 def run() -> None:
-    """Start the worker with hot-reload: restarts on any file change in worker/ or webui/."""
+    """Start the worker with hot-reload: restarts on any file change in agent/, worker/ or webui/."""
     from watchfiles import run_process
 
-    run_process("worker", "webui", target=_entrypoint)
+    run_process("agent", "worker", "webui", target=_entrypoint)

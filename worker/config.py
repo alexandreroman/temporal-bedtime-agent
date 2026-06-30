@@ -6,10 +6,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# pydantic-ai reads the API key from the standard provider env var
-# (e.g. OPENAI_API_KEY) and infers the provider from the model string.
-PYDANTIC_AI_MODEL: str = os.environ.get("PYDANTIC_AI_MODEL", "openai:gpt-5.4-mini")
-
+# The LLM model (PYDANTIC_AI_MODEL) lives with the pure agent in the `agent`
+# package; the worker only owns Temporal and illustration settings.
 OPENAI_IMAGE_MODEL: str = os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-2")
 
 TEMPORAL_ADDRESS: str = os.environ.get("TEMPORAL_ADDRESS", "localhost:7233")

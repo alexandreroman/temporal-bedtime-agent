@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import os
 
-# The agent is constructed at import time and its provider wants an API key,
-# even though these tests never make a network call — they only inspect how the
-# conversation history is rebuilt. Provide a dummy key so the import succeeds in
-# any environment (CI included).
+# Importing `agent` constructs the agent at import time and its provider wants
+# an API key, even though these tests never make a network call — they only
+# inspect how the Conversation rebuilds history. Provide a dummy key so the
+# import succeeds in any environment (CI included).
 os.environ.setdefault("OPENAI_API_KEY", "test-key")
 
 from pydantic_ai.messages import (  # noqa: E402
@@ -15,17 +15,20 @@ from pydantic_ai.messages import (  # noqa: E402
     UserPromptPart,
 )
 
-from worker.agent import SYSTEM_PROMPT  # noqa: E402
-from worker.models import ChatMessage, Role  # noqa: E402
-from worker.workflow_story_session import _build_message_history  # noqa: E402
+from agent import SYSTEM_PROMPT  # noqa: E402
+from agent.conversation import Conversation, Message  # noqa: E402
 
 
-def _sample_messages() -> list[ChatMessage]:
-    return [
-        ChatMessage(role=Role.ASSISTANT, content="Welcome! Who is the hero?"),
-        ChatMessage(role=Role.USER, content="A little dragon named Ember"),
-        ChatMessage(role=Role.ASSISTANT, content="Great choice! What is the quest?"),
-    ]
+def _sample_conversation() -> Conversation:
+    conv = Conversation()
+    conv.messages.extend(
+        [
+            Message("assistant", "Welcome! Who is the hero?"),
+            Message("user", "A little dragon named Ember"),
+            Message("assistant", "Great choice! What is the quest?"),
+        ]
+    )
+    return conv
 
 
 def test_history_carries_system_prompt() -> None:
@@ -37,7 +40,7 @@ def test_history_carries_system_prompt() -> None:
     prepended here, otherwise the agent runs on the per-turn hint alone and a
     single-language chat can drift (e.g. English wandering into Spanish).
     """
-    history = _build_message_history(_sample_messages())
+    history = _sample_conversation().message_history()
 
     system_parts = [
         part
@@ -54,7 +57,7 @@ def test_history_carries_system_prompt() -> None:
 
 
 def test_history_preserves_turns_in_order() -> None:
-    history = _build_message_history(_sample_messages())
+    history = _sample_conversation().message_history()
     conversation = history[1:]  # drop the leading system-prompt request
 
     assert isinstance(conversation[0], ModelResponse)
@@ -69,6 +72,26 @@ def test_history_preserves_turns_in_order() -> None:
 
 
 def test_empty_history_still_carries_system_prompt() -> None:
-    history = _build_message_history([])
+    history = Conversation().message_history()
     assert len(history) == 1
     assert isinstance(history[0].parts[0], SystemPromptPart)
+
+
+def test_turn_numbering_and_recording() -> None:
+    conv = Conversation()
+
+    # Turn 1: the opening greeting carries no history (the agent injects the
+    # system prompt itself) and records no user message.
+    assert conv.turn == 1
+    opening = conv.opening()
+    assert opening.message_history is None
+    assert opening.prompt.startswith("[Turn 1]")
+    assert conv.messages == []
+
+    conv.record_response("greeting")
+    assert conv.turn == 2
+
+    # A reply records the user message and rebuilds history from prior turns.
+    second = conv.reply("Max the dog")
+    assert second.message_history is not None
+    assert [m.role for m in conv.messages] == ["assistant", "user"]

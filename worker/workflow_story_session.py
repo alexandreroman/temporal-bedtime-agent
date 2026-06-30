@@ -9,17 +9,12 @@ from temporalio.workflow import ParentClosePolicy
 with workflow.unsafe.imports_passed_through():
     import annotated_types  # noqa: F401 — pre-load to avoid sandbox warning
 
-    from pydantic_ai.messages import (
-        ModelMessage,
-        ModelRequest,
-        ModelResponse,
-        SystemPromptPart,
-        TextPart,
-        UserPromptPart,
-    )
+    # The conversation flow (turns, hints, history) is an agent concern owned by
+    # the agent package. This workflow only runs the agent and persists state;
+    # it shares the exact same Conversation object as the standalone CLI.
+    from agent.conversation import AgentInput, Conversation
 
     from worker.activities import GenerateIllustrationInput
-    from worker.agent import SYSTEM_PROMPT
     # The Temporal extension layer: a TemporalAgent wrapping the pure
     # `story_agent`. Defined in its own module so this workflow only orchestrates
     # the conversation and never touches the agent's durability wiring.
@@ -32,128 +27,6 @@ with workflow.unsafe.imports_passed_through():
     )
     from worker.workflow_illustration_generation import GenerateIllustrationWorkflow
 
-# Per-turn scaffolding injected into the user prompt to keep the 5-turn flow
-# on track. Hints are only attached to the current call; they are never
-# persisted into self._messages or the conversation history.
-#
-# IMPORTANT: hints are written in English as internal scaffolding. The
-# `message` field MUST be written in the user's language (matching their
-# MOST RECENT substantive reply), NOT in the language of the hint. If the
-# user switches language mid-conversation, follow them.
-_LANGUAGE_REMINDER = (
-    "[STEP 1 — LANGUAGE LOCK, run this BEFORE writing anything else] "
-    "Find the language to lock by scanning user messages from the most "
-    "recent backwards until you hit a SUBSTANTIVE reply — a phrase or "
-    "sentence with real lexical content (function words, verbs, "
-    "adjectives), e.g. 'Max le chien', 'Il cherche son jouet'. SKIP "
-    "non-substantive replies that carry no reliable language signal: "
-    "bare affirmatives ('ok', 'OK', 'oui', 'yes', 'sí', 'ja', 'vas-y', "
-    "'go', \"d'accord\", 'parfait', 'allons-y'), emojis ('👍', '🙂', "
-    "'❤️'), isolated proper nouns ('Max'), or any combination of these. "
-    "If the latest user message IS non-substantive, the lock comes from "
-    "the previous substantive message, NOT from this one and NOT from "
-    "your own previous reply and NOT from the default 'English'. Set "
-    "`language` to the English name of the locked language (e.g. "
-    "'French', 'Spanish', 'English', 'German', 'Italian'). Ignore the "
-    "language of your own previous replies and the language of this "
-    "hint. Write `message`, `story_title`, recap headers, and "
-    "`story_text` ENTIRELY in that language — translate any options, "
-    "headers, and questions you would otherwise have written in another "
-    "language. Keep proper nouns the user gave you as-is. If the locked "
-    "language differs from your previous reply, switch on this turn — "
-    "this applies at the recap (turn 4), at story delivery (turn 5+), "
-    "and every other turn. Never mix languages within a single message. "
-    "`illustration_prompt` stays in English regardless."
-)
-
-_TURN_HINTS: dict[int, str] = {
-    1: "[Turn 1] Greet warmly and ask who the main CHARACTER will be. Offer 3–4 story-level bullets. No user input yet → reply in English.",
-    2: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 2] Ask the QUEST — what the character DOES (searches, helps, faces, explores). Offer 3–4 story-level bullets.",
-    3: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 3] Ask for ONE last ingredient: companion, magical object, or ending. Offer 3–4 story-level bullets.",
-    4: f"{_LANGUAGE_REMINDER}\n\n[STEP 2 — Turn 4] RECAP all ingredients as a bullet list and end with EXACTLY the write-confirmation question: 'Shall I write the story now?' (FR 'Dois-je écrire l'histoire maintenant ?', ES '¿Escribo la historia ahora?', DE 'Soll ich die Geschichte jetzt schreiben?', IT 'Scrivo la storia adesso?'). Do NOT ask 'Is this everything?', 'Is it correct?', 'Tout est-il correct ?', '¿Está todo bien?' or any variant — that phrasing makes the user's 'ok' ambiguous. The question MUST ask whether to WRITE the story now. The ENTIRE recap — the lead-in sentence, the headers, AND the question — MUST be in the language you locked at STEP 1, even if your previous reply was in a different language. In particular, do NOT keep the lead-in ('Here is what we will weave into your story:') in English when the locked language is not English; translate it too. No other questions. Set writing_story=false and keep story_text EMPTY.",
-}
-
-# Used for every turn after the recap (turn 5, 6, 7...). The conversation
-# stays open until the user actually approves.
-_POST_RECAP_HINT = (
-    f"{_LANGUAGE_REMINDER}\n"
-    "\n"
-    "[Turn 5+] The recap has been shown; the user just replied. Pick ONE branch.\n"
-    "\n"
-    "STEP 2 — AFFIRMATIVE GATE (after locking the language above).\n"
-    "Read ONLY the latest user reply (ignore the prior conversation pattern). "
-    "If the entire reply is a short affirmative with no other words — exactly "
-    "one of: 'ok', 'OK', 'oui', 'yes', 'd'accord', 'parfait', 'vas-y', "
-    "'allons-y', 'go', 'sí', 'ja', '👍', or a combination of these only "
-    "('ok vas-y', 'oui parfait', 'ok parfait') — IMMEDIATELY pick Branch A. "
-    "Do not run Step 3. Do not invent content. Adding a sentence like "
-    "'j'ajoute X' when X was not in the user's reply is a CRITICAL "
-    "HALLUCINATION BUG — the user will be stuck in a loop.\n"
-    "\n"
-    "STEP 3 — CONTENT SCAN (only if Step 2 did NOT match).\n"
-    "Scan the user's reply for ANY story content: a name, place, time of day, "
-    "weather, mood, character, action, item, twist, scene, ending, OR the "
-    "words 'plutôt', 'rather', 'instead', 'actually', 'ajoute', 'add', "
-    "'change'. If ANY is present → Branch B or C. A reply that mixes a "
-    "short affirmative WITH new content (e.g. 'ok mais ajoute X') is "
-    "Branch C, not A.\n"
-    "\n"
-    "BRANCH A — APPROVAL (generate now). Triggered by Step 2. "
-    "Action: set `writing_story`=true and fill `story_text` with a COMPLETE "
-    "3-paragraph story in the user's language RIGHT NOW; `message` = ONE warm "
-    "sentence (no question, no story content, no recap, no bullet list). "
-    "`writing_story`=true with an empty `story_text`, or saying 'I'll write it' "
-    "without filling `story_text`, is a CRITICAL bug that strands the user. "
-    "Re-showing the recap on Branch A is a bug.\n"
-    "\n"
-    "BRANCH B — CHANGE REQUEST. The user wants to swap an element ('plutôt un "
-    "cristal', 'rather…', 'instead'). Replace the old element with the new "
-    "one, then follow the REQUIRED OUTPUT below. Set `writing_story`=false and "
-    "keep `story_text` EMPTY.\n"
-    "\n"
-    "BRANCH C — EXTRA DETAIL. The user adds a name, place, mood, twist, scene, "
-    "or event ('à la fin il X', 'il fait nuit', 'Tim le chat l'accompagne', "
-    "'au sommet ils trouvent…', 'ajoute…'). Absorb the detail INTO the "
-    "existing ingredients — do NOT generate the story. Then follow the "
-    "REQUIRED OUTPUT below. Set `writing_story`=false and keep `story_text` EMPTY.\n"
-    "\n"
-    "REQUIRED OUTPUT for Branches B and C — `message` MUST contain ALL THREE "
-    "parts, in this order, in the language locked at the top of this hint:\n"
-    "  1. ONE short acknowledgement sentence ('Parfait, on remplace…' / "
-    "'Très bien, j'ajoute…').\n"
-    "  2. A FRESH FULL RECAP as a Markdown bullet list of the 3 ingredients "
-    "with the update applied. Use the localized headers (FR: Héros / Quête "
-    "/ Compagnon · Fin, ES: Héroe / Misión / Compañero · Final, etc.).\n"
-    "  3. The yes/no question (FR: 'Dois-je écrire l'histoire maintenant ?').\n"
-    "Skipping the recap or the question is a bug — the user must always be "
-    "able to confirm."
-)
-
-
-def _build_message_history(messages: list[ChatMessage]) -> list[ModelMessage]:
-    """Rebuild the pydantic-ai message history from the stored turns.
-
-    pydantic-ai only auto-injects the agent's ``system_prompt`` on the very
-    first run (the one where no ``message_history`` is supplied). On every
-    later turn we hand it a reconstructed history, and pydantic-ai then takes
-    that history verbatim — so unless we prepend the system prompt ourselves
-    it is silently dropped and the agent runs on the per-turn hint alone.
-    Losing the full language-lock and flow rules is exactly what let a
-    single-language conversation drift mid-stream (e.g. an all-English chat
-    wandering into Spanish, or French sliding back to English). Prepending it
-    here keeps the rules in front of the model on every turn. ``SYSTEM_PROMPT``
-    is a module constant, so this stays deterministic under workflow replay.
-    """
-    history: list[ModelMessage] = [
-        ModelRequest(parts=[SystemPromptPart(content=SYSTEM_PROMPT)])
-    ]
-    for msg in messages:
-        if msg.role == Role.USER:
-            history.append(ModelRequest(parts=[UserPromptPart(content=msg.content)]))
-        else:
-            history.append(ModelResponse(parts=[TextPart(content=msg.content)]))
-    return history
-
 
 @workflow.defn
 class StorySessionWorkflow:
@@ -162,7 +35,10 @@ class StorySessionWorkflow:
     __pydantic_ai_agents__ = [temporal_agent]
 
     def __init__(self) -> None:
-        self._messages: list[ChatMessage] = []
+        # The Conversation owns the transcript and builds each turn's agent
+        # input (hint + prompt + history). Plain Python state, so it replays
+        # deterministically with the workflow.
+        self._conversation = Conversation()
         self._story: Story = Story()
         self._finished: bool = False
         # Signal-driven message passing: the signal handler sets this value,
@@ -172,28 +48,18 @@ class StorySessionWorkflow:
         # Illustration child workflow — started once the story is approved.
         self._illustration_workflow_id: str = ""
 
-    async def _run_agent(
-        self, prompt: str, message_history: list[ModelMessage] | None = None
-    ) -> None:
-        """Invoke the agent and apply its response to workflow state."""
-        # Turns 1–4 follow a fixed script; turn 5+ is adaptive (approve /
-        # change / add detail) until the user explicitly greenlights.
-        turn = sum(1 for m in self._messages if m.role == Role.ASSISTANT) + 1
-        hint = _TURN_HINTS.get(turn, _POST_RECAP_HINT)
-        prompt_with_hint = f"{hint}\n\n{prompt}"
-
+    async def _run_turn(self, agent_input: AgentInput) -> None:
+        """Run one agent turn (as a durable activity) and apply its response."""
         self._processing = True
         try:
             result = await temporal_agent.run(
-                prompt_with_hint, message_history=message_history
+                agent_input.prompt, message_history=agent_input.message_history
             )
         finally:
             self._processing = False
 
         response = result.output
-        self._messages.append(
-            ChatMessage(role=Role.ASSISTANT, content=response.message)
-        )
+        self._conversation.record_response(response.message)
         if response.story_title:
             self._story.title = response.story_title
         if response.illustration_prompt:
@@ -207,7 +73,7 @@ class StorySessionWorkflow:
     @workflow.run
     async def run(self) -> SessionState:
         # Initial greeting
-        await self._run_agent("Hello!")
+        await self._run_turn(self._conversation.opening())
 
         # Main loop: wait for user messages, process them
         while not self._finished:
@@ -223,13 +89,7 @@ class StorySessionWorkflow:
             user_msg: str = self._pending_user_message
             self._pending_user_message = None
 
-            # Rebuild pydantic-ai message history from prior turns so the LLM
-            # has full conversational context (incl. the system prompt); the
-            # new user_msg is the prompt.
-            message_history = _build_message_history(self._messages)
-            self._messages.append(ChatMessage(role=Role.USER, content=user_msg))
-
-            await self._run_agent(user_msg, message_history)
+            await self._run_turn(self._conversation.reply(user_msg))
 
             # Start illustration as soon as the story is approved — all
             # elements are finalized and the prompt is definitive.
@@ -271,7 +131,10 @@ class StorySessionWorkflow:
 
     def _build_state(self) -> SessionState:
         return SessionState(
-            messages=self._messages,
+            messages=[
+                ChatMessage(role=Role(m.role), content=m.content)
+                for m in self._conversation.messages
+            ],
             story=self._story,
             finished=self._finished,
             illustration_workflow_id=self._illustration_workflow_id,

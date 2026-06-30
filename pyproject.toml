@@ -28,6 +28,7 @@ testpaths = ["tests"]
 
 [tool.hatch.build.targets.wheel]
 packages = [
+    "agent",
     "worker",
     "webui",
 ]
