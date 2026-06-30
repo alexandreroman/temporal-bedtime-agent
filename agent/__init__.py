@@ -5,13 +5,11 @@ from pydantic_ai import Agent
 from pydantic_ai.settings import ModelSettings
 
 from agent.config import PYDANTIC_AI_MODEL
-from agent.conversation import AgentInput, Conversation, Message
+from agent.conversation import Conversation
 from agent.prompt import SYSTEM_PROMPT
 
 __all__ = [
-    "AgentInput",
     "Conversation",
-    "Message",
     "SYSTEM_PROMPT",
     "StoryResponse",
     "story_agent",

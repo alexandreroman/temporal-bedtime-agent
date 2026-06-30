@@ -1,6 +1,6 @@
 # Temporal Bedtime Agent
 
-An interactive bedtime story creation agent powered by [Temporal](https://temporal.io/) durable execution and [Anthropic](https://www.anthropic.com/) LLM.
+An interactive bedtime story creation agent powered by [Temporal](https://temporal.io/) durable execution and large language models ([OpenAI](https://openai.com/) or [Anthropic](https://www.anthropic.com/)).
 
 The agent guides you through a conversation to collaboratively create a personalized bedtime story, complete with AI-generated illustrations.
 

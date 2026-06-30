@@ -1,7 +1,7 @@
 [project]
 name = "temporal-bedtime-agent"
 version = "0.1.0"
-description = "An interactive bedtime story creation agent powered by Temporal durable execution and Anthropic LLM"
+description = "An interactive bedtime story creation agent powered by Temporal durable execution and large language models (OpenAI or Anthropic)"
 requires-python = ">=3.11"
 dependencies = [
     "temporalio>=1.9.0",
