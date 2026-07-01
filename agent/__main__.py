@@ -4,7 +4,7 @@ from agent import Conversation, story_agent
 from agent.conversation import AgentInput
 
 
-def _demo() -> None:
+def main() -> None:
     """Run the agent interactively as a plain command-line chat.
 
     A minimal REPL around ``story_agent`` driven by a :class:`Conversation`:
@@ -13,7 +13,8 @@ def _demo() -> None:
     by any other caller, so the full flow — story generation included — works
     here just the same.
 
-    Run it with ``python -m agent``. Ctrl-C / Ctrl-D to exit.
+    Run it with ``uv run agent`` (or ``uv run python -m agent``).
+    Ctrl-C / Ctrl-D to exit.
     """
     print("Bedtime Story Agent — interactive CLI. Ctrl-C to exit.\n")
     conversation = Conversation()
@@ -44,4 +45,4 @@ def _demo() -> None:
 
 
 if __name__ == "__main__":
-    _demo()
+    main()

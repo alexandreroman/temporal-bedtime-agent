@@ -12,7 +12,7 @@ The worker and webui logs are in JSON format (via structlog). Use `jq` or simila
 
 ### Code layout
 
-- **`agent/`** — the pure Pydantic AI agent. It MUST stay free of any Temporal dependency or concept (no `temporal`, `workflow`, `activity`, `durable`, even in comments). Holds the system prompt (`prompt.py`), the `StoryResponse` schema and `story_agent` (`__init__.py`), the multi-turn flow as a `Conversation` (`conversation.py`), and a standalone CLI (`python -m agent`).
+- **`agent/`** — the pure Pydantic AI agent. It MUST stay free of any Temporal dependency or concept (no `temporal`, `workflow`, `activity`, `durable`, even in comments). Holds the system prompt (`prompt.py`), the `StoryResponse` schema and `story_agent` (`__init__.py`), the multi-turn flow as a `Conversation` (`conversation.py`), and a standalone CLI (`uv run agent`).
 - **`worker/`** — the Temporal/durability layer. `durable_agent.py` wraps `story_agent` in a `TemporalAgent`; the workflow reuses the agent's `Conversation`. Dependency is one-directional: `worker` → `agent`, never the reverse.
 
 ## Bash usage

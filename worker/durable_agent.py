@@ -14,7 +14,7 @@ The dependency is intentionally one-directional — ``worker`` depends on
     worker/workflow_*.py     →  orchestration    (consumes temporal_agent)
 
 ``story_agent`` has no knowledge of Temporal and stays runnable standalone
-(``python -m agent``); ``temporal_agent`` only adds resilience around it.
+(``uv run agent``); ``temporal_agent`` only adds resilience around it.
 """
 
 from __future__ import annotations

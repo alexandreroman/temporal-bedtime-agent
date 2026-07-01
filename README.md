@@ -151,7 +151,7 @@ Then open [http://localhost:8000](http://localhost:8000) in your browser and sta
 The agent in `agent/` is a plain Pydantic AI agent with **no Temporal dependency**, so you can run it as a standalone command-line chat — no Temporal server, no worker, no web UI:
 
 ```bash
-uv run python -m agent
+uv run agent
 ```
 
 This drives the exact same `Conversation` and `story_agent` the durable workflow uses; only the execution model differs (in-process here, durable activities under Temporal). It needs only an LLM API key (`OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` with an Anthropic model). Note that it is **not** durable: if the process stops, the conversation is lost — which is precisely the resilience Temporal adds in the full app.
@@ -220,7 +220,7 @@ uv run webui 2>&1 | jq .
 │   ├── prompt.py         #   System prompt
 │   ├── conversation.py   #   Conversation: multi-turn flow (turns, hints, history)
 │   ├── config.py         #   LLM model selection (PYDANTIC_AI_MODEL)
-│   └── __main__.py        #   Standalone CLI: `python -m agent`
+│   └── __main__.py        #   Standalone CLI: `uv run agent`
 ├── worker/               # Temporal worker (durability layer)
 │   ├── durable_agent.py  #   Wraps story_agent in a TemporalAgent
 │   ├── workflow_story_session.py   # Conversation workflow

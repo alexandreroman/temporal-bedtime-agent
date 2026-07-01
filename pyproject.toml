@@ -15,6 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
+agent = "agent.__main__:main"
 worker = "worker:run"
 webui = "webui:run"
 
