@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from rich.console import Console
+from rich.markdown import Markdown
+
 from agent import Conversation, story_agent
 from agent.conversation import AgentInput
 
@@ -16,7 +19,8 @@ def main() -> None:
     Run it with ``uv run agent`` (or ``uv run python -m agent``).
     Ctrl-C / Ctrl-D to exit.
     """
-    print("Bedtime Story Agent — interactive CLI. Ctrl-C to exit.\n")
+    console = Console()
+    console.print("Bedtime Story Agent — interactive CLI. Ctrl-C to exit.\n")
     conversation = Conversation()
 
     def run(agent_input: AgentInput) -> bool:
@@ -26,9 +30,12 @@ def main() -> None:
         )
         out = result.output
         conversation.record_response(out.message)
-        print(f"\n{out.message}\n")
+        console.print()
+        console.print(Markdown(out.message))
+        console.print()
         if out.story_text:
-            print(f"{out.story_text}\n")
+            console.print(Markdown(out.story_text))
+            console.print()
             return True
         return False
 
