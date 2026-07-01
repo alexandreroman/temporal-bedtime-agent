@@ -42,6 +42,7 @@ async def generate_illustration(input: GenerateIllustrationInput) -> str:
             ) from e
         raise
 
+    assert response.data is not None
     b64 = response.data[0].b64_json
     assert b64 is not None
     image_bytes = base64.b64decode(b64)

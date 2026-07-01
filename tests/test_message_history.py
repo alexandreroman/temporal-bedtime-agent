@@ -12,6 +12,7 @@ from pydantic_ai.messages import (  # noqa: E402
     ModelRequest,
     ModelResponse,
     SystemPromptPart,
+    TextPart,
     UserPromptPart,
 )
 
@@ -61,6 +62,7 @@ def test_history_preserves_turns_in_order() -> None:
     conversation = history[1:]  # drop the leading system-prompt request
 
     assert isinstance(conversation[0], ModelResponse)
+    assert isinstance(conversation[0].parts[0], TextPart)
     assert conversation[0].parts[0].content == "Welcome! Who is the hero?"
 
     assert isinstance(conversation[1], ModelRequest)
@@ -68,6 +70,7 @@ def test_history_preserves_turns_in_order() -> None:
     assert conversation[1].parts[0].content == "A little dragon named Ember"
 
     assert isinstance(conversation[2], ModelResponse)
+    assert isinstance(conversation[2].parts[0], TextPart)
     assert conversation[2].parts[0].content == "Great choice! What is the quest?"
 
 
