@@ -1,5 +1,6 @@
 {
   "workspace": {
+    "copyPatterns": [".env"],
     "scripts": {
       "setup": "make casper-setup",
       "run": "make app-up",
