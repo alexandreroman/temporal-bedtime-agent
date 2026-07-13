@@ -1,6 +1,6 @@
 {
   "workspace": {
-    "copyPatterns": [".env"],
+    "copyFiles": [".env"],
     "scripts": {
       "setup": "make worktree-ports",
       "run": "make app-up",
