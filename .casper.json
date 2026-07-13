@@ -1,0 +1,11 @@
+{
+  "workspace": {
+    "scripts": {
+      "setup": "make casper-setup",
+      "run": "make app-up",
+      "dev": "make dev",
+      "stop": "make app-down",
+      "teardown": "make app-down"
+    }
+  }
+}

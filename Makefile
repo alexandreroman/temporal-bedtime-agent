@@ -81,6 +81,15 @@ app-down: ## Tear down the full stack (removes containers and network)
 app-logs: ## Follow logs from every stack container
 	docker compose logs -f
 
+##@ Casper
+
+.PHONY: casper-setup
+casper-setup: ## Remap host ports off CASPER_PORT so parallel Casper workspaces don't collide
+	@if [ -n "$$CASPER_PORT" ]; then \
+		printf 'services:\n  temporal:\n    ports: !override\n      - "%s:7233"\n      - "%s:8233"\n  webui:\n    ports: !override\n      - "%s:8000"\n' \
+			$$((CASPER_PORT + 1)) $$((CASPER_PORT + 2)) "$$CASPER_PORT" > compose.override.yaml; \
+	fi
+
 ##@ Helpers
 
 .PHONY: help
