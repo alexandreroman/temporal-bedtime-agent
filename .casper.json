@@ -2,7 +2,7 @@
   "workspace": {
     "copyPatterns": [".env"],
     "scripts": {
-      "setup": "make casper-setup",
+      "setup": "make worktree-ports",
       "run": "make app-up",
       "dev": "make dev",
       "stop": "make app-down",
