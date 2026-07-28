@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from pydantic import BaseModel, Field
-from pydantic_ai import Agent
+from pydantic_ai import Agent, AgentCapability
 from pydantic_ai.settings import ModelSettings
 
 from agent.config import PYDANTIC_AI_MODEL
@@ -12,6 +14,7 @@ __all__ = [
     "Conversation",
     "SYSTEM_PROMPT",
     "StoryResponse",
+    "build_story_agent",
     "story_agent",
 ]
 
@@ -129,9 +132,33 @@ class StoryResponse(BaseModel):
     )
 
 
-story_agent: Agent[None, StoryResponse] = Agent(
-    model=PYDANTIC_AI_MODEL,
-    system_prompt=SYSTEM_PROMPT,
-    output_type=StoryResponse,
-    model_settings=ModelSettings(temperature=0.7),
-)
+def build_story_agent(
+    capabilities: Sequence[AgentCapability[None]] = (),
+) -> Agent[None, StoryResponse]:
+    """Build the bedtime-story agent.
+
+    The agent's own configuration — model, system prompt, output schema and
+    settings — is defined here and nowhere else, so every caller gets the same
+    behaviour.
+
+    `capabilities` lets a caller extend the agent without this package knowing
+    what the extension does: the standalone CLI builds it bare, while callers
+    that need extra behaviour layer it on at construction time. Extending an
+    already-constructed agent is not supported by pydantic-ai, hence a factory
+    rather than a module-level instance alone.
+
+    `name` is fixed here rather than left to callers: some capabilities derive
+    externally visible identifiers from it, and those must stay stable across
+    deployments.
+    """
+    return Agent(
+        model=PYDANTIC_AI_MODEL,
+        name="story_agent",
+        system_prompt=SYSTEM_PROMPT,
+        output_type=StoryResponse,
+        model_settings=ModelSettings(temperature=0.7),
+        capabilities=capabilities,
+    )
+
+
+story_agent: Agent[None, StoryResponse] = build_story_agent()
