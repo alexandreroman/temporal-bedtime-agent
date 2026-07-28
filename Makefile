@@ -70,8 +70,8 @@ dev: .venv infra-up ## Start Temporal, then run worker + webui on the host with 
 
 .PHONY: app-up
 app-up: ## Bring up the full stack in Docker (temporal + worker + webui)
-	docker compose up -d
 	$(show_urls)
+	docker compose up
 
 .PHONY: app-down
 app-down: ## Tear down the full stack (removes containers and network)
