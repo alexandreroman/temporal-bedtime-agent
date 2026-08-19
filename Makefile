@@ -23,6 +23,7 @@ export TEMPORAL_ADDRESS WEBUI_PORT
 else
 WEBUI_URL_PORT     := 8000
 TEMPORAL_UI_PORT   := 8233
+TEMPORAL_GRPC_PORT := 7233
 endif
 
 # Banner listing where to reach the running components.
@@ -31,6 +32,47 @@ define show_urls
 	@echo "The stack is up. Open:"
 	@echo "  Web UI             http://localhost:$(WEBUI_URL_PORT)"
 	@echo "  Temporal dashboard http://localhost:$(TEMPORAL_UI_PORT)"
+endef
+
+# Same endpoint list, published to the Casper info panel so it stays readable
+# once the logs have scrolled past. Skipped when not running inside a Casper
+# workspace, or when the casper CLI is unavailable. $(1) names the run mode,
+# $(2) is an optional closing note, omitted when empty (no commas in either:
+# $(call) would read them as further arguments).
+define casper_info
+	@if [ -n "$$CASPER_WORKSPACE_ID" ] && command -v casper >/dev/null 2>&1; then \
+		info_file="$$(mktemp -t casper-info)"; \
+		mv "$$info_file" "$$info_file.md"; \
+		info_file="$$info_file.md"; \
+		printf '%s\n' \
+			'# Temporal Bedtime Agent' \
+			'' \
+			'> **$(1)**' \
+			'' \
+			'## Endpoints' \
+			'' \
+			'| Endpoint | URL |' \
+			'| --- | --- |' \
+			'| Web UI | <http://localhost:$(WEBUI_URL_PORT)> |' \
+			'| Temporal dashboard | <http://localhost:$(TEMPORAL_UI_PORT)> |' \
+			'' \
+			'## Temporal CLI' \
+			'' \
+			'```' \
+			'temporal --address localhost:$(TEMPORAL_GRPC_PORT) workflow list' \
+			'```' \
+			$(if $(strip $(2)),'' '$(2)',) \
+			> "$$info_file"; \
+		casper info set --file "$$info_file" >/dev/null 2>&1 || true; \
+		rm -f "$$info_file"; \
+	fi
+endef
+
+# Drop the endpoint list once the stack it describes is gone.
+define casper_info_clear
+	@if [ -n "$$CASPER_WORKSPACE_ID" ] && command -v casper >/dev/null 2>&1; then \
+		casper info clear >/dev/null 2>&1 || true; \
+	fi
 endef
 
 ##@ Infra
@@ -42,6 +84,7 @@ infra-up: ## Bring up the Temporal dev server
 .PHONY: infra-down
 infra-down: ## Stop the Temporal dev server (keeps container around)
 	docker compose stop temporal
+	$(casper_info_clear)
 
 .PHONY: infra-logs
 infra-logs: ## Follow logs from the Temporal dev server
@@ -60,6 +103,7 @@ webui: ## Run the FastAPI web UI on :8000 with hot reload
 .PHONY: dev
 dev: .venv infra-up ## Start Temporal, then run worker + webui on the host with hot reload
 	$(show_urls)
+	$(call casper_info,host dev mode,Stop Temporal with `make infra-down`.)
 	@$(MAKE) -j worker webui
 
 .venv: pyproject.toml uv.lock
@@ -71,11 +115,13 @@ dev: .venv infra-up ## Start Temporal, then run worker + webui on the host with 
 .PHONY: app-up
 app-up: ## Bring up the full stack in Docker (temporal + worker + webui)
 	$(show_urls)
+	$(call casper_info,Docker stack,)
 	docker compose up
 
 .PHONY: app-down
 app-down: ## Tear down the full stack (removes containers and network)
 	docker compose down
+	$(casper_info_clear)
 
 .PHONY: app-logs
 app-logs: ## Follow logs from every stack container
