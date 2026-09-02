@@ -114,8 +114,13 @@ class StoryResponse(BaseModel):
     story_title: str = Field(
         default="",
         description=(
-            "Working title for the story, in the language declared in "
-            "`language`. Set as soon as the main character is known."
+            "Working title for the story, written in the language declared "
+            "in `language` above — NOT in the language of `message`, and NOT "
+            "in the language of any example in the system prompt or the "
+            "per-turn hint. Set as soon as the main character is known. This "
+            "field is emitted right after `message`, so re-check it against "
+            "`language` before writing it: if `language` is 'English', the "
+            "title MUST be English."
         ),
     )
     illustration_prompt: str = Field(
