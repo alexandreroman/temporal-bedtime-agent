@@ -23,8 +23,8 @@ graph LR
     A[Browser UI<br/>SPA] <-->|REST| B[FastAPI<br/>webui]
     B <--> C[Temporal Server]
     C <--> D[Temporal Worker<br/>workflows + activities]
-    D -->|Story text| E[LLM<br/>OpenAI gpt-5.4-mini]
-    D -->|Illustration| F[OpenAI Images API<br/>gpt-image-2]
+    D -->|Story text| E[LLM<br/>OpenAI gpt-6-luna]
+    D -->|Illustration| F[OpenAI Images API<br/>gpt-image-2.5-flare]
 ```
 
 - **Web UI (webui)** — FastAPI backend that serves the single-page app and exposes a REST API. It receives user messages and forwards them to Temporal as signals.
@@ -57,7 +57,7 @@ Here are a few scenarios where Temporal makes a difference:
 - **Python 3.11+**
 - **[uv](https://docs.astral.sh/uv/)** — fast Python package manager
 - **Temporal Server** running locally (see below)
-- **OpenAI API key** — for story generation (gpt-5.4-mini) and illustration generation
+- **OpenAI API key** — for story generation (gpt-6-luna) and illustration generation
 - **Anthropic API key** — only if using an Anthropic model for story generation
 
 ## Getting Started
@@ -70,22 +70,22 @@ cp .env-sample .env
 
 Edit `.env` and fill in your API keys:
 
-| Variable              | Description                                                                                                                       | Default               |
-|-----------------------|-----------------------------------------------------------------------------------------------------------------------------------|-----------------------|
-| `OPENAI_API_KEY`      | OpenAI API key for LLM and image generation (required)                                                                            | —                     |
-| `ANTHROPIC_API_KEY`   | Anthropic API key (required only if using an Anthropic model)                                                                     | —                     |
-| `PYDANTIC_AI_MODEL`   | LLM model identifier. Examples: `openai:gpt-5.4-mini` (OpenAI GPT Mini), `anthropic:claude-sonnet-4-6` (Claude Sonnet)            | `openai:gpt-5.4-mini` |
-| `OPENAI_IMAGE_MODEL`  | OpenAI image generation model (see [note below](#image-model-and-organization-verification))                                      | `gpt-image-2`         |
-| `TEMPORAL_ADDRESS`    | Temporal server address                                                                                                           | `localhost:7233`      |
-| `TEMPORAL_TASK_QUEUE` | Temporal task queue name                                                                                                          | `bedtime-story`       |
-| `WEBUI_HOST`          | Web UI bind address                                                                                                               | `0.0.0.0`             |
-| `WEBUI_PORT`          | Web UI port                                                                                                                       | `8000`                |
+| Variable              | Description                                                                                                            | Default               |
+|-----------------------|------------------------------------------------------------------------------------------------------------------------|-----------------------|
+| `OPENAI_API_KEY`      | OpenAI API key for LLM and image generation (required)                                                                 | —                     |
+| `ANTHROPIC_API_KEY`   | Anthropic API key (required only if using an Anthropic model)                                                          | —                     |
+| `PYDANTIC_AI_MODEL`   | LLM model identifier. Examples: `openai:gpt-6-luna` (OpenAI GPT-6 Luna), `anthropic:claude-sonnet-5` (Claude Sonnet 5) | `openai:gpt-6-luna`   |
+| `OPENAI_IMAGE_MODEL`  | OpenAI image generation model (see [note below](#image-model-and-organization-verification))                           | `gpt-image-2.5-flare` |
+| `TEMPORAL_ADDRESS`    | Temporal server address                                                                                                | `localhost:7233`      |
+| `TEMPORAL_TASK_QUEUE` | Temporal task queue name                                                                                               | `bedtime-story`       |
+| `WEBUI_HOST`          | Web UI bind address                                                                                                    | `0.0.0.0`             |
+| `WEBUI_PORT`          | Web UI port                                                                                                            | `8000`                |
 
 #### Image model and organization verification
 
-The default image model `gpt-image-2` (ChatGPT Images 2.0) **requires a verified OpenAI organization**. If your organization is not verified, illustration generation will fail with:
+The default image model `gpt-image-2.5-flare` (GPT Image 2.5) **may require a verified OpenAI organization**. If your organization is not verified, illustration generation will fail with:
 
-> Your organization must be verified to use the model `gpt-image-2`.
+> Your organization must be verified to use the model `gpt-image-2.5-flare`.
 
 You have two options:
 
@@ -108,7 +108,7 @@ This starts the Temporal server, the worker, and the web UI. Open [http://localh
 > For example, to switch the LLM provider from Anthropic to OpenAI, edit `.env`:
 >
 > ```env
-> PYDANTIC_AI_MODEL=openai:gpt-5.4-mini
+> PYDANTIC_AI_MODEL=openai:gpt-6-luna
 > ```
 >
 > Then recreate the worker:
@@ -204,13 +204,13 @@ uv run webui 2>&1 | jq .
 
 #### Common Issues
 
-| Symptom                                                             | Cause                                        | Fix                                                                                                                                      |
-|---------------------------------------------------------------------|----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `Connection refused` on port 7233                                   | Temporal server not running                  | Start it with `temporal server start-dev`                                                                                                |
-| Worker starts but no workflows execute                              | Task queue mismatch                          | Check `TEMPORAL_TASK_QUEUE` matches in `.env`                                                                                            |
-| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` errors                       | Missing or invalid API keys                  | Verify keys in `.env`                                                                                                                    |
-| Illustration not generated                                          | OpenAI API key missing or model unavailable  | Check `OPENAI_API_KEY` and `OPENAI_IMAGE_MODEL` in `.env`                                                                                |
-| `Your organization must be verified to use the model 'gpt-image-2'` | Default model requires a verified OpenAI org | Either [verify your org](https://platform.openai.com/settings/organization/general), or set `OPENAI_IMAGE_MODEL=gpt-image-1.5` in `.env` |
+| Symptom                                                                     | Cause                                        | Fix                                                                                                                                      |
+|-----------------------------------------------------------------------------|----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `Connection refused` on port 7233                                           | Temporal server not running                  | Start it with `temporal server start-dev`                                                                                                |
+| Worker starts but no workflows execute                                      | Task queue mismatch                          | Check `TEMPORAL_TASK_QUEUE` matches in `.env`                                                                                            |
+| `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` errors                               | Missing or invalid API keys                  | Verify keys in `.env`                                                                                                                    |
+| Illustration not generated                                                  | OpenAI API key missing or model unavailable  | Check `OPENAI_API_KEY` and `OPENAI_IMAGE_MODEL` in `.env`                                                                                |
+| `Your organization must be verified to use the model 'gpt-image-2.5-flare'` | Default model requires a verified OpenAI org | Either [verify your org](https://platform.openai.com/settings/organization/general), or set `OPENAI_IMAGE_MODEL=gpt-image-1.5` in `.env` |
 
 ## Project Structure
 

@@ -1,6 +1,6 @@
 services:
   temporal:
-    image: temporalio/temporal:1.7.2
+    image: temporalio/temporal:1.9.1
     pull_policy: missing
     command:
       - server

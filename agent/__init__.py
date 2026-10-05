@@ -161,7 +161,9 @@ def build_story_agent(
         name="story_agent",
         system_prompt=SYSTEM_PROMPT,
         output_type=StoryResponse,
-        model_settings=ModelSettings(temperature=0.7),
+        # Thinking off: recent models reason by default, which ignores
+        # `temperature` and roughly doubles each turn's latency.
+        model_settings=ModelSettings(temperature=0.7, thinking=False),
         capabilities=capabilities,
     )
 
