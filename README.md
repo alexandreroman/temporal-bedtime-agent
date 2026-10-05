@@ -74,7 +74,7 @@ Edit `.env` and fill in your API keys:
 |-----------------------|------------------------------------------------------------------------------------------------------------------------|-----------------------|
 | `OPENAI_API_KEY`      | OpenAI API key for LLM and image generation (required)                                                                 | —                     |
 | `ANTHROPIC_API_KEY`   | Anthropic API key (required only if using an Anthropic model)                                                          | —                     |
-| `PYDANTIC_AI_MODEL`   | LLM model identifier. Examples: `openai:gpt-6-luna` (OpenAI GPT-6 Luna), `anthropic:claude-sonnet-4-6` (Claude Sonnet) | `openai:gpt-6-luna`   |
+| `PYDANTIC_AI_MODEL`   | LLM model identifier. Examples: `openai:gpt-6-luna` (OpenAI GPT-6 Luna), `anthropic:claude-sonnet-5` (Claude Sonnet 5) | `openai:gpt-6-luna`   |
 | `OPENAI_IMAGE_MODEL`  | OpenAI image generation model (see [note below](#image-model-and-organization-verification))                           | `gpt-image-2.5-flare` |
 | `TEMPORAL_ADDRESS`    | Temporal server address                                                                                                | `localhost:7233`      |
 | `TEMPORAL_TASK_QUEUE` | Temporal task queue name                                                                                               | `bedtime-story`       |
