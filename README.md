@@ -10,7 +10,7 @@ The agent guides you through a conversation to collaboratively create a personal
 
 ## Features
 
-- Conversational story creation (character, theme, special elements)
+- Conversational story creation (character, quest, companion or ending)
 - AI-generated bedtime stories (3 paragraphs)
 - Automatic illustration generation from story descriptions
 - Durable execution via Temporal (workflows survive failures and restarts)
@@ -35,9 +35,9 @@ graph LR
 
 The conversational agent is a **pure [Pydantic AI](https://ai.pydantic.dev/) agent that knows nothing about Temporal**. Durability is layered on top without changing a single line of the agent:
 
-- **`agent/`** — the pure agent, with no Temporal dependency: the Pydantic AI `Agent` (`story_agent`), its structured-output schema (`StoryResponse`), the system prompt, and a `Conversation` object that drives the multi-turn flow (per-turn hints, history rebuilding). It runs standalone — see [Run the pure agent](#run-the-pure-agent-standalone).
-- **`worker/durable_agent.py`** — the durability layer: it wraps the pure agent in a Pydantic AI [`TemporalAgent`](https://ai.pydantic.dev/durable_execution/temporal/), turning each LLM call into a retryable Temporal activity. The original agent is untouched.
-- **`worker/workflow_story_session.py`** — the workflow that orchestrates the conversation, reusing the *same* `Conversation` object as the standalone agent.
+- **`agent/`** — the pure agent, with no Temporal dependency: the Pydantic AI agent factory (`build_story_agent`), its structured-output schema (`StoryResponse`), the system prompt, and a `Conversation` object that drives the multi-turn flow (per-turn hints, history rebuilding). It runs standalone — see [Run the pure agent](#run-the-pure-agent-standalone).
+- **`worker/durable_agent.py`** — the durability layer: it builds the same agent with Pydantic AI's [Temporal durability](https://ai.pydantic.dev/durable_execution/temporal/) capability, turning each LLM call into a retryable Temporal activity. The agent definition is untouched.
+- **`worker/workflow_story_session.py`** — the workflow that orchestrates the conversation, reusing the *same* `Conversation` object as the standalone agent, then generates the illustration as an activity.
 
 The dependency is strictly one-directional — `worker` depends on `agent`, never the reverse — which is what lets the very same agent run both as a plain CLI and as a durable workflow.
 
@@ -50,7 +50,7 @@ Here are a few scenarios where Temporal makes a difference:
 - **Worker crashes mid-story** — The user is chatting with the agent and the worker process crashes (OOM, deployment, bug). Without Temporal, the entire conversation and story progress would be lost. With Temporal, the workflow state is preserved: when the worker restarts, the conversation resumes exactly where it left off.
 - **LLM API timeout** — A call to Claude or OpenAI times out or returns a transient error. Temporal automatically retries the failed activity with configurable backoff, without duplicating work that already succeeded (e.g., the story text is not regenerated if only the illustration call failed).
 - **Long-running interaction** — A user starts a story, closes the browser, and comes back hours later. The workflow keeps waiting for the next user message; there is no session timeout to manage and no state to serialize to a database.
-- **Multiple workers** — In production, several worker instances can run in parallel. Temporal dispatches activities across workers and guarantees exactly-once execution, making the system horizontally scalable with no extra coordination code.
+- **Multiple workers** — In production, several worker instances can run in parallel. Temporal dispatches activities across workers, retries failed ones and never re-runs completed ones, making the system horizontally scalable with no extra coordination code.
 
 ## Prerequisites
 
@@ -154,7 +154,7 @@ The agent in `agent/` is a plain Pydantic AI agent with **no Temporal dependency
 uv run agent
 ```
 
-This drives the exact same `Conversation` and `story_agent` the durable workflow uses; only the execution model differs (in-process here, durable activities under Temporal). It needs only an LLM API key (`OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` with an Anthropic model). Note that it is **not** durable: if the process stops, the conversation is lost — which is precisely the resilience Temporal adds in the full app.
+This drives the exact same `Conversation` and agent definition the durable workflow uses; only the execution model differs (in-process here, durable activities under Temporal). It needs only an LLM API key (`OPENAI_API_KEY`, or `ANTHROPIC_API_KEY` with an Anthropic model). Note that it is **not** durable: if the process stops, the conversation is lost — which is precisely the resilience Temporal adds in the full app.
 
 ## Development
 
@@ -176,7 +176,15 @@ uv run worker
 uv run webui
 ```
 
-Each command runs in its own terminal. The worker watches the `agent/`, `worker/`, and `webui/` directories; any saved change restarts it automatically. The web UI reloads on changes to `webui/` and `static/`.
+Each command runs in its own terminal. The worker watches the `agent/` and `worker/` directories; any saved change restarts it automatically. The web UI reloads on Python changes; static files are served fresh on each request.
+
+Alternatively, `make dev` starts the Temporal server in Docker and runs the worker and web UI on the host, and `make app-up` runs the whole stack in Docker (`make help` lists every target).
+
+Run the tests with:
+
+```bash
+uv run pytest
+```
 
 Open [http://localhost:8000](http://localhost:8000) for the app and [http://localhost:8233](http://localhost:8233) for the Temporal dashboard.
 
@@ -216,19 +224,23 @@ uv run webui 2>&1 | jq .
 
 ```
 ├── agent/                # Pure Pydantic AI agent — NO Temporal dependency
-│   ├── __init__.py       #   StoryResponse schema + story_agent
+│   ├── __init__.py       #   StoryResponse schema + build_story_agent()
 │   ├── prompt.py         #   System prompt
 │   ├── conversation.py   #   Conversation: multi-turn flow (turns, hints, history)
 │   ├── config.py         #   LLM model selection (PYDANTIC_AI_MODEL)
-│   └── __main__.py        #   Standalone CLI: `uv run agent`
+│   └── __main__.py       #   Standalone CLI: `uv run agent`
 ├── worker/               # Temporal worker (durability layer)
-│   ├── durable_agent.py  #   Wraps story_agent in a TemporalAgent
-│   ├── workflow_story_session.py   # Conversation workflow
-│   ├── workflow_illustration_generation.py
+│   ├── durable_agent.py  #   Builds the agent with Temporal durability
+│   ├── workflow_story_session.py   # Conversation + illustration workflow
 │   ├── activities.py     #   Illustration generation (OpenAI Images)
-│   └── ...
+│   ├── models.py         #   Session state shared with the web UI
+│   └── __main__.py       #   Worker entry point: `uv run worker`
 ├── webui/                # FastAPI REST API serving the frontend
 ├── static/               # Single-page app (HTML, JS, CSS)
+├── tests/                # Unit tests (`uv run pytest`)
+├── Dockerfile            # One image for the worker and the web UI
+├── compose.yaml          # Temporal + worker + web UI stack
+├── Makefile              # Dev shortcuts (`make help`)
 ├── pyproject.toml        # Project metadata and dependencies
 └── .env-sample           # Environment variable template
 ```

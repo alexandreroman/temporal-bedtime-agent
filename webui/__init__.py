@@ -10,11 +10,8 @@ from pydantic import BaseModel
 from temporalio.client import Client, WorkflowExecutionStatus
 from temporalio.service import RPCError, RPCStatusCode
 
-from webui.config import TASK_QUEUE, TEMPORAL_ADDRESS
-from webui.models import SessionState, Story
-# The worker persists its own SessionState in workflow history; the webui
-# wraps it with presentation fields (session_id, processing, illustration_*).
-from worker.models import SessionState as WorkerSessionState
+from worker.config import TASK_QUEUE, TEMPORAL_ADDRESS
+from worker.models import SessionState
 
 structlog.configure(
     processors=[
@@ -41,22 +38,11 @@ async def get_client() -> Client:
     return _client
 
 
-async def _fill_illustration(client: Client, workflow_id: str, story: Story) -> None:
-    """Populate the story's illustration fields from the child workflow status."""
-    handle = client.get_workflow_handle(workflow_id)
-    try:
-        desc = await handle.describe()
-    except RPCError as e:
-        if e.status == RPCStatusCode.NOT_FOUND:
-            return
-        raise
-
-    if desc.status == WorkflowExecutionStatus.COMPLETED:
-        story.illustration_url = await handle.result()
-    elif desc.status == WorkflowExecutionStatus.RUNNING:
-        story.illustration_loading = True
-    else:
-        story.illustration_failed = True
+def _http_error(e: RPCError, event: str, session_id: str) -> HTTPException:
+    """404 only for an unknown session; anything else is a transient outage."""
+    logger.error(event, session_id=session_id, error=str(e))
+    status_code = 404 if e.status == RPCStatusCode.NOT_FOUND else 503
+    return HTTPException(status_code=status_code, detail=e.message)
 
 
 class CreateSessionResponse(BaseModel):
@@ -85,62 +71,33 @@ async def create_session() -> CreateSessionResponse:
 @app.get("/api/sessions/{session_id}/state", response_model=SessionState)
 async def get_session_state(session_id: str) -> SessionState:
     client = await get_client()
+    handle = client.get_workflow_handle(session_id, result_type=SessionState)
     try:
-        handle = client.get_workflow_handle(session_id)
         desc = await handle.describe()
         if desc.status == WorkflowExecutionStatus.COMPLETED:
             # Workflow finished — get the result directly, no query needed
-            worker_state = WorkerSessionState.model_validate(await handle.result())
-            processing = False
-        else:
-            # Workflow still running — query for current state
-            worker_state = await handle.query(
-                "get_state", result_type=WorkerSessionState
-            )
-            processing = await handle.query("is_processing", result_type=bool)
-    except Exception as e:
-        logger.error("Failed to get session state", session_id=session_id, error=str(e))
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
-    # The story workflow starts the illustration as a child workflow
-    # once the story is approved. The webui only polls its status.
-    story = Story(title=worker_state.story.title, text=worker_state.story.text)
-    if worker_state.illustration_workflow_id:
-        try:
-            await _fill_illustration(client, worker_state.illustration_workflow_id, story)
-        except Exception as e:
-            logger.error("Illustration poll failed", session_id=session_id, error=str(e))
-
-    return SessionState(
-        session_id=session_id,
-        messages=worker_state.messages,
-        story=story,
-        finished=worker_state.finished,
-        processing=processing,
-    )
+            return await handle.result()
+        # Workflow still running — query for current state
+        return await handle.query("get_state", result_type=SessionState)
+    except RPCError as e:
+        raise _http_error(e, "Failed to get session state", session_id) from e
 
 
 @app.post("/api/sessions/{session_id}/messages")
 async def send_message(session_id: str, req: SendMessageRequest) -> dict[str, str]:
     client = await get_client()
     try:
-        handle = client.get_workflow_handle(session_id)
-        await handle.signal("send_message", req.message)
-        logger.info("Message sent", session_id=session_id)
-        return {"status": "sent"}
-    except Exception as e:
-        logger.error("Failed to send message", session_id=session_id, error=str(e))
-        raise HTTPException(status_code=404, detail=str(e)) from e
+        await client.get_workflow_handle(session_id).signal("send_message", req.message)
+    except RPCError as e:
+        raise _http_error(e, "Failed to send message", session_id) from e
+    logger.info("Message sent", session_id=session_id)
+    return {"status": "sent"}
 
 
+# `/stories/<id>` deep links are routed client-side by the SPA.
 @app.get("/")
-async def index() -> FileResponse:
-    return FileResponse("static/index.html")
-
-
-# Catch-all for deep-linked story URLs — the SPA handles routing client-side.
 @app.get("/stories/{story_id}")
-async def session_page(story_id: str) -> FileResponse:
+async def index() -> FileResponse:
     return FileResponse("static/index.html")
 
 

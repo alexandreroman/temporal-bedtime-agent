@@ -22,9 +22,9 @@ services:
     restart: unless-stopped
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile.worker
+    build: .
+    image: temporal-bedtime-agent
+    command: ["python", "-m", "worker"]
     env_file: .env
     environment:
       TEMPORAL_ADDRESS: temporal:7233
@@ -41,9 +41,10 @@ services:
     restart: on-failure
 
   webui:
-    build:
-      context: .
-      dockerfile: Dockerfile.webui
+    # Same image as the worker, built once by the worker service.
+    image: temporal-bedtime-agent
+    pull_policy: never
+    command: ["python", "-m", "webui"]
     env_file: .env
     environment:
       TEMPORAL_ADDRESS: temporal:7233

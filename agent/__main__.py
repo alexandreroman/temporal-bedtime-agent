@@ -3,14 +3,14 @@ from __future__ import annotations
 from rich.console import Console
 from rich.markdown import Markdown
 
-from agent import Conversation, story_agent
+from agent import Conversation, build_story_agent
 from agent.conversation import AgentInput
 
 
 def main() -> None:
     """Run the agent interactively as a plain command-line chat.
 
-    A minimal REPL around ``story_agent`` driven by a :class:`Conversation`:
+    A minimal REPL around the story agent driven by a :class:`Conversation`:
     the conversation builds each turn's prompt and history, the REPL runs the
     agent and feeds the reply back. The same Conversation object can be driven
     by any other caller, so the full flow — story generation included — works
@@ -21,6 +21,7 @@ def main() -> None:
     """
     console = Console()
     console.print("Bedtime Story Agent — interactive CLI. Ctrl-C to exit.\n")
+    story_agent = build_story_agent()
     conversation = Conversation()
 
     def run(agent_input: AgentInput) -> bool:

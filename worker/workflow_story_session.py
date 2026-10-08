@@ -1,37 +1,29 @@
 from __future__ import annotations
 
 from temporalio import workflow
-from temporalio.workflow import ParentClosePolicy
+from temporalio.exceptions import ActivityError
 
-# Temporal's workflow sandbox restricts imports to enforce determinism.
-# `imports_passed_through()` lets these non-deterministic libraries bypass
-# the sandbox since they are only used inside activities, not workflow logic.
+# Temporal's workflow sandbox re-imports modules for every run. Pass these
+# through instead: they are deterministic and side-effect free at import time,
+# and re-importing pydantic-ai and openai on each run would be costly.
 with workflow.unsafe.imports_passed_through():
-    import annotated_types  # noqa: F401 — pre-load to avoid sandbox warning
-
     # The conversation flow (turns, hints, history) is an agent concern owned by
     # the agent package. This workflow only runs the agent and persists state;
     # it shares the exact same Conversation object as the standalone CLI.
     from agent.conversation import AgentInput, Conversation
 
-    from worker.activities import GenerateIllustrationInput
-    # The Temporal extension layer: a TemporalAgent wrapping the pure
-    # `story_agent`. Defined in its own module so this workflow only orchestrates
-    # the conversation and never touches the agent's durability wiring.
-    from worker.durable_agent import temporal_agent
-    from worker.models import (
-        ChatMessage,
-        Role,
-        SessionState,
-        Story,
-    )
-    from worker.workflow_illustration_generation import GenerateIllustrationWorkflow
+    from worker.activities import GenerateIllustrationInput, generate_illustration
+    # The Temporal extension layer: the pure agent rebuilt with the
+    # `TemporalDurability` capability. Defined in its own module so this
+    # workflow only orchestrates the conversation.
+    from worker.durable_agent import ACTIVITY_CONFIG, temporal_agent
+    from worker.models import ChatMessage, SessionState, Story
 
 
 @workflow.defn
 class StorySessionWorkflow:
-    # Declares which TemporalAgents this workflow uses, so their activities
-    # are automatically registered on the worker.
+    # Declares the durable agents this workflow uses, so their activities are
+    # automatically registered on the worker.
     __pydantic_ai_agents__ = [temporal_agent]
 
     def __init__(self) -> None:
@@ -39,14 +31,12 @@ class StorySessionWorkflow:
         # input (hint + prompt + history). Plain Python state, so it replays
         # deterministically with the workflow.
         self._conversation = Conversation()
-        self._story: Story = Story()
-        self._finished: bool = False
-        # Signal-driven message passing: the signal handler sets this value,
-        # and the main loop picks it up via wait_condition().
-        self._pending_user_message: str | None = None
-        self._processing: bool = False
-        # Illustration child workflow — started once the story is approved.
-        self._illustration_workflow_id: str = ""
+        self._story = Story()
+        self._finished = False
+        # Signal-driven message passing: the signal handler queues messages,
+        # and the main loop picks them up via wait_condition().
+        self._pending_messages: list[str] = []
+        self._processing = False
 
     async def _run_turn(self, agent_input: AgentInput) -> None:
         """Run one agent turn (as a durable activity) and apply its response."""
@@ -75,75 +65,58 @@ class StorySessionWorkflow:
         # Initial greeting
         await self._run_turn(self._conversation.opening())
 
-        # Main loop: wait for user messages, process them
+        # Main loop: wait for user messages until the story is written.
         while not self._finished:
-            await workflow.wait_condition(
-                lambda: self._pending_user_message is not None or self._finished
-            )
+            await workflow.wait_condition(lambda: bool(self._pending_messages))
+            # Join messages sent before the previous turn finished, so none
+            # is dropped.
+            user_message = "\n".join(self._pending_messages)
+            self._pending_messages.clear()
+            await self._run_turn(self._conversation.reply(user_message))
 
-            if self._finished:
-                break
-
-            # wait_condition above guarantees this is non-None.
-            assert self._pending_user_message is not None
-            user_msg: str = self._pending_user_message
-            self._pending_user_message = None
-
-            await self._run_turn(self._conversation.reply(user_msg))
-
-            # Start illustration as soon as the story is approved — all
-            # elements are finalized and the prompt is definitive.
-            if self._finished and self._story.illustration_prompt:
-                await self._start_illustration()
+        # The story is approved: all elements are final, so is the prompt.
+        if self._story.illustration_prompt:
+            await self._generate_illustration()
 
         return self._build_state()
 
-    async def _start_illustration(self) -> None:
-        """Start the illustration child workflow."""
-        info = workflow.info()
-        self._illustration_workflow_id = f"{info.workflow_id}-illustration"
+    async def _generate_illustration(self) -> None:
+        """Illustrate the story; a failure is shown in the UI, the story stands."""
         # Force any visible text inside the illustration to match the story's
         # language — the agent never embeds this directive itself.
-        language = self._story.language or "English"
         prompt = (
             f"{self._story.illustration_prompt}\n\n"
-            f"Any visible text inside the image must be written in {language}."
+            f"Any visible text inside the image must be written in {self._story.language}."
         )
-        await workflow.start_child_workflow(
-            GenerateIllustrationWorkflow.run,
-            GenerateIllustrationInput(
-                prompt=prompt,
-                story_id=info.workflow_id,
-            ),
-            id=self._illustration_workflow_id,
-            task_queue=info.task_queue,
-            parent_close_policy=ParentClosePolicy.ABANDON,
-        )
+        self._story.illustration_loading = True
+        try:
+            self._story.illustration_url = await workflow.execute_activity(
+                generate_illustration,
+                GenerateIllustrationInput(
+                    prompt=prompt, story_id=workflow.info().workflow_id
+                ),
+                **ACTIVITY_CONFIG,
+            )
+        except ActivityError:
+            self._story.illustration_failed = True
+        finally:
+            self._story.illustration_loading = False
 
     @workflow.signal
-    async def send_message(self, message: str) -> None:
-        # Concatenate concurrent messages so none is dropped if the user
-        # sends multiple before the previous one is processed.
-        if self._pending_user_message is None:
-            self._pending_user_message = message
-        else:
-            self._pending_user_message += "\n" + message
-
-    def _build_state(self) -> SessionState:
-        return SessionState(
-            messages=[
-                ChatMessage(role=Role(m.role), content=m.content)
-                for m in self._conversation.messages
-            ],
-            story=self._story,
-            finished=self._finished,
-            illustration_workflow_id=self._illustration_workflow_id,
-        )
+    def send_message(self, message: str) -> None:
+        self._pending_messages.append(message)
 
     @workflow.query
     def get_state(self) -> SessionState:
         return self._build_state()
 
-    @workflow.query
-    def is_processing(self) -> bool:
-        return self._processing
+    def _build_state(self) -> SessionState:
+        return SessionState(
+            messages=[
+                ChatMessage(role=m.role, content=m.content)
+                for m in self._conversation.messages
+            ],
+            story=self._story,
+            finished=self._finished,
+            processing=self._processing,
+        )

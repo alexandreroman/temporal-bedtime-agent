@@ -1,10 +1,11 @@
 # syntax=docker/dockerfile:1
+# One image for both the worker and the web UI; compose picks the command.
 FROM python:3.13-slim AS build
 WORKDIR /app
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.12.23 /uv /uvx /bin/
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,id=uv-cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --no-install-project
@@ -23,13 +24,15 @@ FROM python:3.13-slim AS runtime
 WORKDIR /app
 ENV PATH="/app/.venv/bin:$PATH"
 # tini as PID 1: forwards SIGINT/SIGTERM to the app and reaps zombies so
-# `docker stop` and rolling restarts shut the web UI down gracefully.
+# `docker stop` and rolling restarts shut the process down gracefully.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tini \
  && rm -rf /var/lib/apt/lists/*
 RUN useradd --create-home --uid 1000 app
 COPY --from=build --chown=app:app /app /app
+# Pre-create the illustrations directory owned by app. The "illustrations"
+# named volume is mounted here; Docker initializes a fresh volume's ownership
+# from this path, so the non-root app user can write generated images.
+RUN install -d -o app -g app /app/static/illustrations
 USER app
-EXPOSE 8000
 ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["python", "-m", "webui"]

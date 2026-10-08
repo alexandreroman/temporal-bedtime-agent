@@ -39,7 +39,7 @@ LANGUAGE_REMINDER = (
     "sentence with real lexical content (function words, verbs, "
     "adjectives), e.g. 'Max le chien', 'Il cherche son jouet'. SKIP "
     "non-substantive replies that carry no reliable language signal: "
-    "bare affirmatives ('ok', 'OK', 'oui', 'yes', 'sí', 'ja', 'vas-y', "
+    "bare affirmatives ('ok', 'OK', 'oui', 'yes', 'sí', 'sì', 'ja', 'vas-y', "
     "'go', \"d'accord\", 'parfait', 'allons-y'), emojis ('👍', '🙂', "
     "'❤️'), isolated proper nouns ('Max'), or any combination of these. "
     "If the latest user message IS non-substantive, the lock comes from "
@@ -76,7 +76,7 @@ POST_RECAP_HINT = (
     "Read ONLY the latest user reply (ignore the prior conversation pattern). "
     "If the entire reply is a short affirmative with no other words — exactly "
     "one of: 'ok', 'OK', 'oui', 'yes', 'd'accord', 'parfait', 'vas-y', "
-    "'allons-y', 'go', 'sí', 'ja', '👍', or a combination of these only "
+    "'allons-y', 'go', 'sí', 'sì', 'ja', '👍', or a combination of these only "
     "('ok vas-y', 'oui parfait', 'ok parfait') — IMMEDIATELY pick Branch A. "
     "Do not run Step 3. Do not invent content. Adding a sentence like "
     "'j'ajoute X' when X was not in the user's reply is a CRITICAL "
@@ -139,11 +139,6 @@ POST_RECAP_HINT = (
 _OPENING_PROMPT = "Hello!"
 
 
-def _hint_for_turn(turn: int) -> str:
-    """Scaffolding for ``turn``: the fixed script for 1–4, adaptive for 5+."""
-    return TURN_HINTS.get(turn, POST_RECAP_HINT)
-
-
 @dataclass(frozen=True)
 class Message:
     """One recorded turn of the visible conversation."""
@@ -170,7 +165,7 @@ class Conversation:
 
     Usage from any caller::
 
-        conv = Conversation()                 # defaults to the agent's prompt
+        conv = Conversation()
         agent_input = conv.opening()          # turn 1
         reply = run_the_agent(agent_input)    # caller's job (sync, async, ...)
         conv.record_response(reply.message)
@@ -180,11 +175,8 @@ class Conversation:
 
     The transcript holds only the visible ``message`` text (not the agent's
     structured fields), exactly what the model needs to re-derive its state.
-    ``system_prompt`` defaults to this agent's prompt; pass a different one only
-    to reuse the conversation machinery for another agent.
     """
 
-    system_prompt: str = SYSTEM_PROMPT
     messages: list[Message] = field(default_factory=list)
 
     @property
@@ -215,7 +207,7 @@ class Conversation:
         conversations drift languages mid-stream.
         """
         history: list[ModelMessage] = [
-            ModelRequest(parts=[SystemPromptPart(content=self.system_prompt)])
+            ModelRequest(parts=[SystemPromptPart(content=SYSTEM_PROMPT)])
         ]
         for message in self.messages:
             if message.role == "user":
@@ -232,7 +224,9 @@ class Conversation:
         # History and turn are derived from the messages gathered SO FAR, before
         # this turn's user message is recorded.
         history = self.message_history() if self.messages else None
-        prompt = f"{_hint_for_turn(self.turn)}\n\n{user_message}"
+        # The fixed script for turns 1–4, the adaptive post-recap hint after.
+        hint = TURN_HINTS.get(self.turn, POST_RECAP_HINT)
+        prompt = f"{hint}\n\n{user_message}"
         if record_user:
             self.messages.append(Message("user", user_message))
         return AgentInput(prompt=prompt, message_history=history)
