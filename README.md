@@ -37,7 +37,7 @@ The conversational agent is a **pure [Pydantic AI](https://ai.pydantic.dev/) age
 
 - **`agent/`** — the pure agent, with no Temporal dependency: the Pydantic AI agent factory (`build_story_agent`), its structured-output schema (`StoryResponse`), the system prompt, and a `Conversation` object that drives the multi-turn flow (per-turn hints, history rebuilding). It runs standalone — see [Run the pure agent](#run-the-pure-agent-standalone).
 - **`worker/durable_agent.py`** — the durability layer: it builds the same agent with Pydantic AI's [Temporal durability](https://ai.pydantic.dev/durable_execution/temporal/) capability, turning each LLM call into a retryable Temporal activity. The agent definition is untouched.
-- **`worker/workflow_story_session.py`** — the workflow that orchestrates the conversation, reusing the *same* `Conversation` object as the standalone agent, then generates the illustration as an activity.
+- **`worker/workflow_story_session.py`** — the workflow that orchestrates the conversation, reusing the *same* `Conversation` object as the standalone agent, then generates the illustration in a child workflow (`worker/workflow_illustration_generation.py`).
 
 The dependency is strictly one-directional — `worker` depends on `agent`, never the reverse — which is what lets the very same agent run both as a plain CLI and as a durable workflow.
 
@@ -231,7 +231,8 @@ uv run webui 2>&1 | jq .
 │   └── __main__.py       #   Standalone CLI: `uv run agent`
 ├── worker/               # Temporal worker (durability layer)
 │   ├── durable_agent.py  #   Builds the agent with Temporal durability
-│   ├── workflow_story_session.py   # Conversation + illustration workflow
+│   ├── workflow_story_session.py   # Conversation workflow (parent)
+│   ├── workflow_illustration_generation.py  # Illustration child workflow
 │   ├── activities.py     #   Illustration generation (OpenAI Images)
 │   ├── models.py         #   Session state shared with the web UI
 │   └── __main__.py       #   Worker entry point: `uv run worker`

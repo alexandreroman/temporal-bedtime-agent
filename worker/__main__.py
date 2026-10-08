@@ -10,6 +10,7 @@ from temporalio.worker import Worker
 
 from worker.activities import generate_illustration
 from worker.config import TASK_QUEUE, TEMPORAL_ADDRESS
+from worker.workflow_illustration_generation import GenerateIllustrationWorkflow
 from worker.workflow_story_session import StorySessionWorkflow
 
 structlog.configure(
@@ -34,7 +35,7 @@ async def main() -> None:
     worker = Worker(
         client,
         task_queue=TASK_QUEUE,
-        workflows=[StorySessionWorkflow],
+        workflows=[StorySessionWorkflow, GenerateIllustrationWorkflow],
         activities=[generate_illustration],
         identity=identity,
     )

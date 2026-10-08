@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from temporalio import workflow
-from temporalio.exceptions import ActivityError
+from temporalio.exceptions import ChildWorkflowError
 
 # Temporal's workflow sandbox re-imports modules for every run. Pass these
 # through instead: they are deterministic and side-effect free at import time,
@@ -12,12 +12,13 @@ with workflow.unsafe.imports_passed_through():
     # it shares the exact same Conversation object as the standalone CLI.
     from agent.conversation import AgentInput, Conversation
 
-    from worker.activities import GenerateIllustrationInput, generate_illustration
+    from worker.activities import GenerateIllustrationInput
     # The Temporal extension layer: the pure agent rebuilt with the
     # `TemporalDurability` capability. Defined in its own module so this
     # workflow only orchestrates the conversation.
-    from worker.durable_agent import ACTIVITY_CONFIG, temporal_agent
+    from worker.durable_agent import temporal_agent
     from worker.models import ChatMessage, SessionState, Story
+    from worker.workflow_illustration_generation import GenerateIllustrationWorkflow
 
 
 @workflow.defn
@@ -81,23 +82,22 @@ class StorySessionWorkflow:
         return self._build_state()
 
     async def _generate_illustration(self) -> None:
-        """Illustrate the story; a failure is shown in the UI, the story stands."""
+        """Illustrate the story in a child workflow; on failure the story stands."""
         # Force any visible text inside the illustration to match the story's
         # language — the agent never embeds this directive itself.
         prompt = (
             f"{self._story.illustration_prompt}\n\n"
             f"Any visible text inside the image must be written in {self._story.language}."
         )
+        story_id = workflow.info().workflow_id
         self._story.illustration_loading = True
         try:
-            self._story.illustration_url = await workflow.execute_activity(
-                generate_illustration,
-                GenerateIllustrationInput(
-                    prompt=prompt, story_id=workflow.info().workflow_id
-                ),
-                **ACTIVITY_CONFIG,
+            self._story.illustration_url = await workflow.execute_child_workflow(
+                GenerateIllustrationWorkflow.run,
+                GenerateIllustrationInput(prompt=prompt, story_id=story_id),
+                id=f"{story_id}-illustration",
             )
-        except ActivityError:
+        except ChildWorkflowError:
             self._story.illustration_failed = True
         finally:
             self._story.illustration_loading = False
