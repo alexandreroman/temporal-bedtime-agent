@@ -1,5 +1,4 @@
 let sessionId = null;
-let polling = null;
 let lastMessageCount = 0;
 // Minimum server-side message count required before the input is safe to
 // re-enable. Raised by sendMessage() and checked in pollState() so a poll
@@ -15,16 +14,13 @@ async function initSession() {
     // Check if URL matches /stories/<id>
     const match = window.location.pathname.match(/^\/stories\/(.+)/);
     if (match) {
-        const id = match[1];
-        sessionId = `story-${id}`;
-        try {
-            const res = await fetch(`/api/sessions/${sessionId}/state`);
-            if (res.ok) {
-                startPolling();
-                return;
-            }
-        } catch (_) {
-            // Session not found, fall through to create new one
+        sessionId = `story-${match[1]}`;
+        // Only an unknown session starts over. Any other failure (backend
+        // briefly down) resumes the story: polling retries until it is back.
+        const res = await fetch(`/api/sessions/${sessionId}/state`).catch(() => null);
+        if (res?.status !== 404) {
+            pollState();
+            return;
         }
     }
 
@@ -34,19 +30,16 @@ async function initSession() {
     sessionId = data.session_id;
     const shortId = sessionId.replace(/^story-/, "");
     window.history.replaceState(null, "", `/stories/${shortId}`);
-    startPolling();
-}
-
-function startPolling() {
     pollState();
-    polling = setInterval(pollState, 1000);
 }
 
+// Polls once per second, scheduling the next poll only after the previous
+// one settled, so a slow or unavailable backend never piles up requests.
 async function pollState() {
-    if (!sessionId) return;
-
+    let done = false;
     try {
         const res = await fetch(`/api/sessions/${sessionId}/state`);
+        if (!res.ok) return; // transient outage — retry on the next tick
         const state = await res.json();
         renderChat(state.messages);
         renderStory(state.story);
@@ -57,19 +50,21 @@ async function pollState() {
             document.getElementById("story-panel").classList.remove("story-pending");
 
             // Keep polling until the illustration is ready, then stop.
-            if (!state.story.illustration_loading) {
-                clearInterval(polling);
-            }
+            done = !state.story.illustration_loading;
         } else if (!state.processing && state.messages.length >= expectedMessageCount) {
             setInputEnabled(true);
         }
     } catch (e) {
         console.error("Polling error:", e);
+    } finally {
+        if (!done) setTimeout(pollState, 1000);
     }
 }
 
 function renderChat(messages) {
-    if (messages.length === lastMessageCount) return;
+    // The server count only grows; a lower count means a just-sent message
+    // not yet recorded by the workflow, already rendered optimistically.
+    if (messages.length <= lastMessageCount) return;
     lastMessageCount = messages.length;
 
     chatMessages.innerHTML = "";
@@ -77,7 +72,7 @@ function renderChat(messages) {
         const div = document.createElement("div");
         div.className = `chat-msg ${msg.role}`;
         if (msg.role === "assistant") {
-            div.innerHTML = marked.parse(msg.content);
+            div.innerHTML = DOMPurify.sanitize(marked.parse(msg.content));
         } else {
             div.textContent = msg.content;
         }
@@ -141,7 +136,7 @@ function renderStory(story) {
     }
 
     if (story.text) {
-        const parsed = marked.parse(story.text);
+        const parsed = DOMPurify.sanitize(marked.parse(story.text));
         if (textEl.innerHTML !== parsed) {
             textEl.innerHTML = parsed;
             textEl.classList.remove("story-hidden");
@@ -181,8 +176,8 @@ async function sendMessage() {
     setInputEnabled(false);
 
     // Optimistically render the user message before the server round-trip.
-    // Increment lastMessageCount so pollState() won't duplicate it when the
-    // server-side state catches up.
+    // Counting it in lastMessageCount keeps pollState() from re-rendering
+    // until the server-side state moves past it.
     const div = document.createElement("div");
     div.className = "chat-msg user";
     div.textContent = message;
@@ -191,17 +186,19 @@ async function sendMessage() {
     lastMessageCount++;
 
     try {
-        await fetch(`/api/sessions/${sessionId}/messages`, {
+        const res = await fetch(`/api/sessions/${sessionId}/messages`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ message }),
         });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
     } catch (e) {
         console.error("Send failed:", e);
-        // Rollback the optimistic state so the user can retry.
-        expectedMessageCount = lastMessageCount - 1;
+        // Roll back the optimistic state so the user can retry.
         lastMessageCount--;
+        expectedMessageCount = lastMessageCount;
         div.remove();
+        chatInput.value = message;
         setInputEnabled(true);
     }
 }

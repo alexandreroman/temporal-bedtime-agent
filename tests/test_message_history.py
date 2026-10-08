@@ -1,14 +1,6 @@
 from __future__ import annotations
 
-import os
-
-# Importing `agent` constructs the agent at import time and its provider wants
-# an API key, even though these tests never make a network call — they only
-# inspect how the Conversation rebuilds history. Provide a dummy key so the
-# import succeeds in any environment (CI included).
-os.environ.setdefault("OPENAI_API_KEY", "test-key")
-
-from pydantic_ai.messages import (  # noqa: E402
+from pydantic_ai.messages import (
     ModelRequest,
     ModelResponse,
     SystemPromptPart,
@@ -16,8 +8,8 @@ from pydantic_ai.messages import (  # noqa: E402
     UserPromptPart,
 )
 
-from agent import SYSTEM_PROMPT  # noqa: E402
-from agent.conversation import Conversation, Message  # noqa: E402
+from agent import SYSTEM_PROMPT
+from agent.conversation import Conversation, Message
 
 
 def _sample_conversation() -> Conversation:

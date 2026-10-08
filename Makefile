@@ -1,11 +1,7 @@
 .DEFAULT_GOAL := dev
 
-# Canonical environment. Required for app targets, baseline for dev.
-# Optional: missing .env is not an error.
-ifneq (,$(wildcard .env))
-include .env
-export
-endif
+# .env is read by docker compose and by each component's config.py (which
+# never overrides a variable exported here), so make does not include it.
 
 # compose.override.yaml (auto-merged by docker compose) may remap the published
 # host ports so parallel workspaces don't collide. It is the source of truth: when
@@ -116,7 +112,7 @@ dev: .venv infra-up ## Start Temporal, then run worker + webui on the host with 
 app-up: ## Bring up the full stack in Docker (temporal + worker + webui)
 	$(show_urls)
 	$(call casper_info,Docker stack,)
-	docker compose up
+	docker compose up --build
 
 .PHONY: app-down
 app-down: ## Tear down the full stack (removes containers and network)

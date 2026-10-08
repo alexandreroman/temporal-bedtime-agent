@@ -15,7 +15,6 @@ __all__ = [
     "SYSTEM_PROMPT",
     "StoryResponse",
     "build_story_agent",
-    "story_agent",
 ]
 
 
@@ -150,7 +149,7 @@ def build_story_agent(
     what the extension does: the standalone CLI builds it bare, while callers
     that need extra behaviour layer it on at construction time. Extending an
     already-constructed agent is not supported by pydantic-ai, hence a factory
-    rather than a module-level instance alone.
+    rather than a module-level instance.
 
     `name` is fixed here rather than left to callers: some capabilities derive
     externally visible identifiers from it, and those must stay stable across
@@ -166,6 +165,3 @@ def build_story_agent(
         model_settings=ModelSettings(temperature=0.7, thinking=False),
         capabilities=capabilities,
     )
-
-
-story_agent: Agent[None, StoryResponse] = build_story_agent()

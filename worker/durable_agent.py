@@ -24,6 +24,18 @@ from datetime import timedelta
 from agent import build_story_agent
 from pydantic_ai.durable_exec.temporal import TemporalDurability
 from temporalio.common import RetryPolicy
+from temporalio.workflow import ActivityConfig
+
+# Timeout and retries shared by every activity: the agent's LLM calls and the
+# illustration generation.
+ACTIVITY_CONFIG = ActivityConfig(
+    start_to_close_timeout=timedelta(seconds=60),
+    retry_policy=RetryPolicy(
+        initial_interval=timedelta(seconds=1),
+        backoff_coefficient=1.5,
+        maximum_interval=timedelta(seconds=5),
+    ),
+)
 
 # Build the pydantic-ai agent with Temporal durability attached: each LLM call
 # is executed as a durable, retryable activity instead of a plain in-process
@@ -33,16 +45,5 @@ from temporalio.common import RetryPolicy
 # `build_story_agent`) — they must stay stable so that workflows started by an
 # earlier deployment still replay.
 temporal_agent = build_story_agent(
-    capabilities=[
-        TemporalDurability(
-            activity_config={
-                "start_to_close_timeout": timedelta(seconds=60),
-                "retry_policy": RetryPolicy(
-                    initial_interval=timedelta(seconds=1),
-                    backoff_coefficient=1.5,
-                    maximum_interval=timedelta(seconds=5),
-                ),
-            },
-        )
-    ],
+    capabilities=[TemporalDurability(activity_config=ACTIVITY_CONFIG)],
 )

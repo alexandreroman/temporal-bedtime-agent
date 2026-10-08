@@ -15,3 +15,8 @@ build/
 static/illustrations/
 *.md
 LICENSE
+*.png
+tests/
+.pytest_cache/
+.casper.json
+compose.override.yaml

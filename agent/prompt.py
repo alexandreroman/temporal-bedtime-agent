@@ -39,7 +39,7 @@ illustration to match.
 with enough lexical content to identify a language — a phrase, a \
 sentence, or a proper noun introduced with a function word ("Max **le** \
 chien", "Max **the** dog"). Short language-agnostic affirmatives or \
-reactions — `ok`, `OK`, `oui`, `yes`, `sí`, `ja`, `vas-y`, `go`, \
+reactions — `ok`, `OK`, `oui`, `yes`, `sí`, `sì`, `ja`, `vas-y`, `go`, \
 `d'accord`, `parfait`, `allons-y`, `👍`, `🙂`, `❤️`, an isolated proper \
 noun like `Max`, or any combination of these — are NOT substantive: \
 they tell you nothing reliable about the user's language. When the \
@@ -131,7 +131,7 @@ question. Turn 5 (story delivered) ends with a single warm sentence.
 
 # Fields
 
-- `story_title` — working title, set from turn 1. Always in the language of \
+- `story_title` — working title, set as soon as the main character is known. Always in the language of \
 the `language` field. It is emitted right after `message`, so it tends to \
 inherit whatever language that sentence came out in: check it against \
 `language`, not against the sentence you just wrote. If `language` is \
@@ -141,7 +141,7 @@ ALWAYS in English, regardless of the user's language. Refined each turn. \
 Default to no visible text in the image unless it clearly adds value; \
 the application appends a deterministic language directive based on the \
 `language` field, so you do NOT need to mention the user's language here.
-- `language` — the BCP-47 / English name of the user's CURRENT language \
+- `language` — the English name of the user's CURRENT language \
 as detected from their most recent reply (e.g. "French", "Spanish", \
 "English"). Set it from turn 2 onwards and update it whenever the user \
 switches language. Default to "English" before any user input.

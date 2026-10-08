@@ -1,29 +1,27 @@
 from __future__ import annotations
 
-from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 
-class Role(str, Enum):
-    USER = "user"
-    ASSISTANT = "assistant"
-
-
 class ChatMessage(BaseModel):
-    role: Role
+    role: Literal["user", "assistant"]
     content: str
 
 
 class Story(BaseModel):
     title: str = ""
-    illustration_prompt: str = ""
     text: str = ""
-    language: str = ""
+    language: str = "English"
+    illustration_prompt: str = ""
+    illustration_url: str = ""
+    illustration_loading: bool = False
+    illustration_failed: bool = False
 
 
 class SessionState(BaseModel):
     messages: list[ChatMessage] = Field(default_factory=list)
     story: Story = Field(default_factory=Story)
     finished: bool = False
-    illustration_workflow_id: str = ""
+    processing: bool = False
